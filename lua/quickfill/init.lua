@@ -311,7 +311,7 @@ end
 ---@param buf number
 ---@param params table
 local function lsp_request(buf, method, params)
-    return function(resume)
+    return vim.schedule_wrap(function(resume)
         local supported = false
         for _, client in ipairs(vim.lsp.get_clients { bufnr = 0 }) do
             if client:supports_method(method) then
@@ -342,7 +342,7 @@ local function lsp_request(buf, method, params)
                 resume {}
             end
         end)
-    end
+    end)
 end
 
 local function is_function(kind)
