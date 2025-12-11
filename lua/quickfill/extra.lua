@@ -1,15 +1,19 @@
 local M = {}
 
 local async = require "quickfill.async"
-local request = require "quickfill.request"
 local config = require "quickfill.config"
-local state = require "quickfill.state"
+
+---@type table<quickfill.ExtraChunk>
+local chunks = {}
 
 ---@param text string
 local function trim(text)
     return text:gsub("^%s+", ""):gsub("^\t+", "")
 end
 
+---@param lines1 table<string>
+---@param lines2 table<string>
+---@return number
 local function similarity(lines1, lines2)
     local inter = {}
     local common = 0
@@ -22,6 +26,18 @@ local function similarity(lines1, lines2)
         end
     end
     return 2 * common / (#lines1 + #lines2)
+end
+
+---@return table<quickfill.ExtraChunk>
+function M.get_input_extra()
+    local input_extra = {}
+    for _, chunk in ipairs(chunks) do
+        input_extra[#input_extra + 1] = {
+            filename = chunk.filename,
+            text = table.concat(chunk.lines, "\n") .. "\n",
+        }
+    end
+    return input_extra
 end
 
 ---@param buf number
@@ -63,27 +79,21 @@ function M.try_add_chunk(buf, row)
     }
 
     -- TODO: chunks should have unique lines between them
-    for idx, chunk in ipairs(state.chunks) do
+    for idx, chunk in ipairs(chunks) do
         if similarity(lines, chunk.lines) > 0.55 then
-            table.remove(state.chunks, idx)
+            table.remove(chunks, idx)
         end
     end
 
-    if #state.chunks + 1 > config.MAX_EXTRAS then
-        table.remove(state.chunks, 1)
+    if #chunks + 1 > config.MAX_EXTRAS then
+        table.remove(chunks, 1)
     end
-    state.chunks[#state.chunks + 1] = new_chunk
+    chunks[#chunks + 1] = new_chunk
 
-    local input_extra = {}
-    for _, chunk in ipairs(state.chunks) do
-        input_extra[#input_extra + 1] = {
-            filename = chunk.filename,
-            text = table.concat(chunk.lines, "\n") .. "\n",
-        }
-    end
+    local input_extra = M.get_input_extra()
 
     async.async(function()
-        async.await(request.request_json(
+        async.await(require("quickfill.request").request_json(
             "infill",
             vim.json.encode {
                 input_prefix = "",

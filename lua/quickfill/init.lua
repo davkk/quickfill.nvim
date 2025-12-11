@@ -24,7 +24,7 @@ local group = vim.api.nvim_create_augroup("ai", { clear = true })
 
 vim.api.nvim_create_user_command("AI", function()
     vim.keymap.set("i", "<C-q>", function()
-        if #state.suggestion > 0 then
+        if #suggestion.get() > 0 then
             if vim.fn.pumvisible() == 1 then
                 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-e>", true, false, true), "n", false)
             end
@@ -33,7 +33,7 @@ vim.api.nvim_create_user_command("AI", function()
     end)
 
     vim.keymap.set("i", "<C-l>", function()
-        if #state.suggestion > 0 then
+        if #suggestion.get() > 0 then
             if vim.fn.pumvisible() == 1 then
                 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-e>", true, false, true), "n", false)
             end
@@ -46,8 +46,6 @@ vim.api.nvim_create_user_command("AI", function()
             local local_context = context.get_local_context()
             local lsp_context = context.get_lsp_context(local_context.middle)
             vim.schedule(function()
-                state.request_id = state.request_id + 1
-                state.current_request_id = state.request_id
                 request.request_infill(state.current_request_id, local_context, lsp_context)
             end)
         end)()
@@ -100,7 +98,6 @@ vim.api.nvim_create_user_command("AI", function()
                 if request_id ~= state.current_request_id then
                     return
                 end
-                state.suggestion = best
                 suggestion.show(best, row, col)
                 return
             end

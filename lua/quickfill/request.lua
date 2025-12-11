@@ -5,21 +5,29 @@ local state = require "quickfill.state"
 local config = require "quickfill.config"
 local cache = require "quickfill.cache"
 local suggestion = require "quickfill.suggestion"
+local extra = require "quickfill.extra"
+
+---@type uv.uv_process_t?
+local handle = nil
+---@type uv.uv_pipe_t?
+local stdout = nil
+---@type uv.uv_pipe_t?
+local stdin = nil
 
 function M.cancel_stream()
     pcall(function()
-        if state.handle and state.handle:is_active() then
-            state.handle:kill()
-            state.handle:close()
-            state.handle = nil
+        if handle and handle:is_active() then
+            handle:kill()
+            handle:close()
+            handle = nil
         end
-        if state.stdin then
-            state.stdin:close()
-            state.stdin = nil
+        if stdin then
+            stdin:close()
+            stdin = nil
         end
-        if state.stdout then
-            state.stdout:close()
-            state.stdout = nil
+        if stdout then
+            stdout:close()
+            stdout = nil
         end
     end)
 end
@@ -41,14 +49,8 @@ function M.request_infill(request_id, local_context, lsp_context)
 
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 
-    -- TODO: this should be a function in extra
-    local input_extra = {}
-    for _, chunk in ipairs(state.chunks) do
-        input_extra[#input_extra + 1] = {
-            filename = chunk.filename,
-            text = table.concat(chunk.lines, "\n") .. "\n",
-        }
-    end
+    local input_extra = extra.get_input_extra()
+
     if lsp_context.completions then
         input_extra[#input_extra + 1] = { text = lsp_context.completions }
     end
@@ -84,9 +86,9 @@ function M.request_infill(request_id, local_context, lsp_context)
         stop = stop,
     }
 
-    state.stdout = vim.uv.new_pipe(false)
-    state.stdin = vim.uv.new_pipe(false)
-    state.handle = vim.uv.spawn("curl", {
+    stdout = vim.uv.new_pipe(false)
+    stdin = vim.uv.new_pipe(false)
+    handle = vim.uv.spawn("curl", {
         args = {
             ("%s/infill"):format(config.URL),
             "--no-buffer",
@@ -97,15 +99,15 @@ function M.request_infill(request_id, local_context, lsp_context)
             "-d",
             "@-",
         },
-        stdio = { state.stdin, state.stdout },
+        stdio = { stdin, stdout },
     }, function(code)
-        if state.stdout then
-            state.stdout:close()
-            state.stdout = nil
+        if stdout then
+            stdout:close()
+            stdout = nil
         end
-        if state.handle then
-            state.handle:close()
-            state.handle = nil
+        if handle then
+            handle:close()
+            handle = nil
         end
         if code ~= 0 then
             vim.schedule(function()
@@ -113,14 +115,18 @@ function M.request_infill(request_id, local_context, lsp_context)
             end)
         end
     end)
-    state.stdin:write(payload, function()
-        state.stdin:close()
-    end)
-    state.stdout:read_start(function(_, chunk)
-        if chunk then
-            M.on_stream_chunk(chunk, local_context, request_id, row, col)
-        end
-    end)
+    if stdin then
+        stdin:write(payload, function()
+            stdin:close()
+        end)
+    end
+    if stdout then
+        stdout:read_start(function(_, chunk)
+            if chunk then
+                M.on_stream_chunk(chunk, local_context, request_id, row, col)
+            end
+        end)
+    end
 end
 
 ---@param chunk string
@@ -144,14 +150,14 @@ function M.on_stream_chunk(chunk, local_context, request_id, row, col)
                     return
                 end
             end
-            state.suggestion = state.suggestion .. text
             vim.schedule(function()
                 if request_id ~= state.current_request_id then
                     return
                 end
-                suggestion.show(state.suggestion, row, col)
-                if state.suggestion and #state.suggestion > 0 then
-                    cache.cache_add(local_context, state.suggestion)
+                local new_suggestion = suggestion.get() .. text
+                suggestion.show(new_suggestion, row, col)
+                if #new_suggestion > 0 then
+                    cache.cache_add(local_context, new_suggestion)
                 end
             end)
         end
