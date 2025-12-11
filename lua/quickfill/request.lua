@@ -41,6 +41,7 @@ function M.request_infill(request_id, local_context, lsp_context)
 
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 
+    -- TODO: this should be a function in extra
     local input_extra = {}
     for _, chunk in ipairs(state.chunks) do
         input_extra[#input_extra + 1] = {

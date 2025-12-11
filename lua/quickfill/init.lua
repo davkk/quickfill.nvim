@@ -1,4 +1,16 @@
-local M = {}
+---@class quickfill.LocalContext
+---@field prefix string
+---@field middle string
+---@field suffix string
+
+---@class quickfill.LspContext
+---@field logit_bias table<string, string>
+---@field completions string?
+---@field signatures string?
+
+---@class quickfill.ExtraChunk
+---@field filename string
+---@field lines table<string, boolean>
 
 local state = require "quickfill.state"
 local async = require "quickfill.async"
@@ -124,5 +136,3 @@ vim.api.nvim_create_user_command("AI", function()
         end,
     })
 end, {})
-
-return M

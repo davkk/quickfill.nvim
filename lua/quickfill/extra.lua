@@ -5,13 +5,23 @@ local request = require "quickfill.request"
 local config = require "quickfill.config"
 local state = require "quickfill.state"
 
----@class quickfill.ExtraChunk
----@field filename string
----@field lines table<string>
-
 ---@param text string
 local function trim(text)
     return text:gsub("^%s+", ""):gsub("^\t+", "")
+end
+
+local function similarity(lines1, lines2)
+    local inter = {}
+    local common = 0
+    for _, val in ipairs(lines1) do
+        inter[val] = true
+    end
+    for _, val in ipairs(lines2) do
+        if inter[val] then
+            common = common + 1
+        end
+    end
+    return 2 * common / (#lines1 + #lines2)
 end
 
 ---@param buf number
@@ -54,25 +64,14 @@ function M.try_add_chunk(buf, row)
 
     -- TODO: chunks should have unique lines between them
     for idx, chunk in ipairs(state.chunks) do
-        local common = 0
-        local chunk_lines = {}
-        for _, line1 in ipairs(chunk.lines) do
-            chunk_lines[line1] = true
-        end
-        for _, line2 in ipairs(lines) do
-            if chunk_lines[line2] then
-                common = common + 1
-            end
-        end
-        if 2 * common / (#lines + #chunk.lines) > 0.8 then
+        if similarity(lines, chunk.lines) > 0.55 then
             table.remove(state.chunks, idx)
         end
     end
 
-    if #state.chunks + 1 > 16 then
+    if #state.chunks + 1 > config.MAX_EXTRAS then
         table.remove(state.chunks, 1)
     end
-
     state.chunks[#state.chunks + 1] = new_chunk
 
     local input_extra = {}

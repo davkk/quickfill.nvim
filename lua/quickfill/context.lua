@@ -4,16 +4,6 @@ local config = require "quickfill.config"
 local async = require "quickfill.async"
 local request = require "quickfill.request"
 
----@class quickfill.LocalContext
----@field prefix string
----@field middle string
----@field suffix string
-
----@class quickfill.LspContext
----@field logit_bias table<string, string>
----@field completions string?
----@field signatures string?
-
 ---@return quickfill.LocalContext
 function M.get_local_context()
     local buf = vim.api.nvim_get_current_buf()
@@ -90,20 +80,6 @@ function M.get_lsp_context(line)
         if resp.result then
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
-                ---@type string
-                local commentstring = vim.api.nvim_get_option_value("commentstring", { buf = 0 }) or "%s"
-                if sig.documentation then
-                    local docs = sig.documentation.value or sig.documentation
-                    local docs_lines = vim.split(docs, "\n")
-                    for i, doc in ipairs(docs_lines) do
-                        if i > 20 then
-                            signature[#signature + 1] = commentstring:format "..."
-                            break
-                        end
-                        signature[#signature + 1] = commentstring:format(doc)
-                    end
-                end
-
                 if sig.label then
                     signature[#signature + 1] = sig.label
                 end
@@ -173,7 +149,7 @@ function M.get_lsp_context(line)
     for _, token in ipairs(tokenize_resp.tokens or {}) do
         local piece = token.piece
         if not logit_bias[piece] then
-            logit_bias[piece] = 2
+            logit_bias[piece] = 3
         end
     end
 
