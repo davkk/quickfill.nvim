@@ -12,7 +12,6 @@
 ---@field filename string
 ---@field lines table<string, boolean>
 
-local state = require "quickfill.state"
 local async = require "quickfill.async"
 local cache = require "quickfill.cache"
 local context = require "quickfill.context"
@@ -46,7 +45,7 @@ vim.api.nvim_create_user_command("AI", function()
             local local_context = context.get_local_context()
             local lsp_context = context.get_lsp_context(local_context.middle)
             vim.schedule(function()
-                request.request_infill(state.current_request_id, local_context, lsp_context)
+                request.request_infill(request.next_request_id(), local_context, lsp_context)
             end)
         end)()
     end)
@@ -57,9 +56,7 @@ vim.api.nvim_create_user_command("AI", function()
             request.cancel_stream()
             suggestion.clear()
 
-            state.request_id = state.request_id + 1
-            local request_id = state.request_id
-            state.current_request_id = request_id
+            local request_id = request.next_request_id()
 
             local row, col = unpack(vim.api.nvim_win_get_cursor(0))
             local best = ""
@@ -95,7 +92,7 @@ vim.api.nvim_create_user_command("AI", function()
             end
 
             if #best > 0 then
-                if request_id ~= state.current_request_id then
+                if request_id ~= request.latest_id() then
                     return
                 end
                 suggestion.show(best, row, col)
@@ -103,12 +100,12 @@ vim.api.nvim_create_user_command("AI", function()
             end
 
             async.async(function()
-                if request_id ~= state.current_request_id then
+                if request_id ~= request.latest_id() then
                     return
                 end
                 local lsp_context = context.get_lsp_context(local_context.middle)
                 vim.schedule(function()
-                    if request_id ~= state.current_request_id then
+                    if request_id ~= request.latest_id() then
                         return
                     end
                     request.request_infill(request_id, local_context, lsp_context)

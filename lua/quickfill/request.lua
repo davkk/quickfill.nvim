@@ -1,7 +1,6 @@
 local M = {}
 
 local utils = require "quickfill.utils"
-local state = require "quickfill.state"
 local config = require "quickfill.config"
 local cache = require "quickfill.cache"
 local suggestion = require "quickfill.suggestion"
@@ -13,6 +12,19 @@ local handle = nil
 local stdout = nil
 ---@type uv.uv_pipe_t?
 local stdin = nil
+
+local request_id = 0
+
+---@return number
+function M.latest_id()
+    return request_id
+end
+
+---@return number
+function M.next_request_id()
+    request_id = request_id + 1
+    return request_id
+end
 
 function M.cancel_stream()
     pcall(function()
@@ -32,15 +44,15 @@ function M.cancel_stream()
     end)
 end
 
----@param request_id number
+---@param req_id number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
-function M.request_infill(request_id, local_context, lsp_context)
+function M.request_infill(req_id, local_context, lsp_context)
     if vim.bo.readonly or vim.bo.buftype ~= "" then
         return
     end
 
-    if request_id ~= state.current_request_id then
+    if req_id ~= request_id then
         return
     end
 
@@ -123,7 +135,7 @@ function M.request_infill(request_id, local_context, lsp_context)
     if stdout then
         stdout:read_start(function(_, chunk)
             if chunk then
-                M.on_stream_chunk(chunk, local_context, request_id, row, col)
+                M.on_stream_chunk(chunk, local_context, req_id, row, col)
             end
         end)
     end
@@ -131,11 +143,11 @@ end
 
 ---@param chunk string
 ---@param local_context quickfill.LocalContext
----@param request_id number
+---@param req_id number
 ---@param row number
 ---@param col number
-function M.on_stream_chunk(chunk, local_context, request_id, row, col)
-    if request_id ~= state.current_request_id then
+function M.on_stream_chunk(chunk, local_context, req_id, row, col)
+    if req_id ~= request_id then
         return
     end
     if #chunk > 6 and chunk:sub(1, 6) == "data: " then
@@ -151,7 +163,7 @@ function M.on_stream_chunk(chunk, local_context, request_id, row, col)
                 end
             end
             vim.schedule(function()
-                if request_id ~= state.current_request_id then
+                if req_id ~= request_id then
                     return
                 end
                 local new_suggestion = suggestion.get() .. text
