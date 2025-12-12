@@ -37,4 +37,20 @@ function M.tbl_copy(tbl)
     return new
 end
 
+---@param a string
+---@param b string
+---@return string, string, string
+function M.overlap(a, b)
+    local max_overlap = math.min(#a, #b)
+    local ol = 0
+    for i = 1, max_overlap do
+        local a_end = a:sub(-i)
+        local b_start = b:sub(1, i)
+        if a_end == b_start then
+            ol = i
+        end
+    end
+    return a:sub(1, #a - ol), a:sub(#a - ol + 1), b:sub(ol + 1)
+end
+
 return M

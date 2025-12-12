@@ -65,16 +65,28 @@ local function is_function(kind)
         or kind == vim.lsp.protocol.CompletionItemKind.Method
 end
 
+---@param buf number
 ---@param line string
+---@param row number?
+---@param col number?
 ---@return quickfill.LspContext
-function M.get_lsp_context(line)
-    local params = vim.lsp.util.make_position_params(0, "utf-8")
+function M.get_lsp_context(buf, line, row, col)
+    local params
+    if row and col then
+        params = {
+            textDocument = { uri = vim.uri_from_bufnr(buf) },
+            position = { line = row - 1, character = col },
+        }
+    else
+        params = vim.lsp.util.make_position_params(0, "utf-8")
+    end
 
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.SignatureHelp, context: lsp.HandlerContext }>
-    local sig_resp = async.await(lsp_request(0, "textDocument/signatureHelp", params)) or {}
+    local sig_resp = async.await(lsp_request(buf, "textDocument/signatureHelp", params)) or {}
     local signatures = {}
     for _, resp in ipairs(sig_resp) do
         if resp.err then
+            vim.notify(("error while lsp signature help: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
             break
         end
         if resp.result then
@@ -89,10 +101,11 @@ function M.get_lsp_context(line)
     end
 
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.CompletionList, context: lsp.HandlerContext }>
-    local cmp_resp = async.await(lsp_request(0, "textDocument/completion", params)) or {}
+    local cmp_resp = async.await(lsp_request(buf, "textDocument/completion", params)) or {}
     local cmp_items = {}
     for _, resp in ipairs(cmp_resp) do
         if resp.err then
+            vim.notify(("error while lsp completion: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
             break
         end
         if resp.result then

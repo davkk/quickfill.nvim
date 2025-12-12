@@ -1,5 +1,6 @@
 local M = {}
 
+local async = require "quickfill.async"
 local utils = require "quickfill.utils"
 local config = require "quickfill.config"
 local cache = require "quickfill.cache"
@@ -47,7 +48,8 @@ end
 ---@param req_id number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
-function M.request_infill(req_id, local_context, lsp_context)
+---@param speculative? string
+function M.request_infill(req_id, local_context, lsp_context, speculative)
     if vim.bo.readonly or vim.bo.buftype ~= "" then
         return
     end
@@ -56,8 +58,10 @@ function M.request_infill(req_id, local_context, lsp_context)
         return
     end
 
-    M.cancel_stream()
-    suggestion.clear()
+    if not speculative then
+        M.cancel_stream()
+        suggestion.clear()
+    end
 
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 
@@ -125,6 +129,39 @@ function M.request_infill(req_id, local_context, lsp_context)
             vim.schedule(function()
                 vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
             end)
+            return
+        end
+        if #suggestion.get() > 0 then
+            vim.schedule(function()
+                local sug = suggestion.get()
+                if speculative and #speculative > 0 then
+                    local _, _, suffix = utils.overlap(speculative, sug)
+                    sug = suffix
+                end
+                cache.cache_add(local_context, sug)
+            end)
+        end
+        if not speculative then
+            local sug = suggestion.get()
+            local new_line = local_context.middle .. sug
+            local new_local_context = {
+                prefix = local_context.prefix,
+                middle = new_line,
+                suffix = local_context.suffix,
+            }
+            vim.schedule(function()
+                local temp_buf = vim.api.nvim_create_buf(false, true)
+                local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+                lines[row] = new_line
+                vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
+                async.async(function()
+                    local new_lsp_context =
+                        require("quickfill.context").get_lsp_context(temp_buf, new_line, row, col + #new_line - 1)
+                    vim.schedule(function()
+                        M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
+                    end)
+                end)()
+            end)
         end
     end)
     if stdin then
@@ -135,18 +172,17 @@ function M.request_infill(req_id, local_context, lsp_context)
     if stdout then
         stdout:read_start(function(_, chunk)
             if chunk then
-                M.on_stream_chunk(chunk, local_context, req_id, row, col)
+                M.on_stream_chunk(chunk, req_id, row, col)
             end
         end)
     end
 end
 
 ---@param chunk string
----@param local_context quickfill.LocalContext
 ---@param req_id number
 ---@param row number
 ---@param col number
-function M.on_stream_chunk(chunk, local_context, req_id, row, col)
+function M.on_stream_chunk(chunk, req_id, row, col)
     if req_id ~= request_id then
         return
     end
@@ -166,11 +202,8 @@ function M.on_stream_chunk(chunk, local_context, req_id, row, col)
                 if req_id ~= request_id then
                     return
                 end
-                local new_suggestion = suggestion.get() .. text
+                local new_suggestion = suggestion.get() .. text:gsub(" ", "·")
                 suggestion.show(new_suggestion, row, col)
-                if #new_suggestion > 0 then
-                    cache.cache_add(local_context, new_suggestion)
-                end
             end)
         end
     end

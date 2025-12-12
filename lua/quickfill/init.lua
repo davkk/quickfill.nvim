@@ -41,9 +41,10 @@ vim.api.nvim_create_user_command("AI", function()
     end)
 
     vim.keymap.set("i", "<C-space>", function()
+        local buf = vim.api.nvim_get_current_buf()
         async.async(function()
             local local_context = context.get_local_context()
-            local lsp_context = context.get_lsp_context(local_context.middle)
+            local lsp_context = context.get_lsp_context(buf, local_context.middle)
             vim.schedule(function()
                 request.request_infill(request.next_request_id(), local_context, lsp_context)
             end)
@@ -58,6 +59,7 @@ vim.api.nvim_create_user_command("AI", function()
 
             local request_id = request.next_request_id()
 
+            ---@type number, number
             local row, col = unpack(vim.api.nvim_win_get_cursor(0))
             local best = ""
             local local_context = context.get_local_context()
@@ -99,11 +101,12 @@ vim.api.nvim_create_user_command("AI", function()
                 return
             end
 
+            local buf = vim.api.nvim_get_current_buf()
             async.async(function()
                 if request_id ~= request.latest_id() then
                     return
                 end
-                local lsp_context = context.get_lsp_context(local_context.middle)
+                local lsp_context = context.get_lsp_context(buf, local_context.middle)
                 vim.schedule(function()
                     if request_id ~= request.latest_id() then
                         return
