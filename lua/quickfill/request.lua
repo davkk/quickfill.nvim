@@ -155,10 +155,14 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
                 lines[row] = new_line
                 vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
                 async.async(function()
-                    local new_lsp_context =
-                        require("quickfill.context").get_lsp_context(temp_buf, new_line, row, col + #new_line - 1)
+                    local context = require "quickfill.context"
+                    for _, client in ipairs(clients) do
+                        vim.lsp.buf_attach_client(temp_buf, client.id)
+                    end
+                    local new_lsp_context = context.get_lsp_context(temp_buf, new_line, row, col + #new_line - 1)
                     vim.schedule(function()
                         M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
+                        vim.api.nvim_buf_delete(temp_buf, { force = true })
                     end)
                 end)()
             end)
@@ -202,7 +206,7 @@ function M.on_stream_chunk(chunk, req_id, row, col)
                 if req_id ~= request_id then
                     return
                 end
-                local new_suggestion = suggestion.get() .. text:gsub(" ", "·")
+                local new_suggestion = suggestion.get() .. text
                 suggestion.show(new_suggestion, row, col)
             end)
         end

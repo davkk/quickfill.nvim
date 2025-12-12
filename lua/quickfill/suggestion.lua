@@ -17,7 +17,7 @@ function M.show(text, row, col)
     suggestion = text
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
         pcall(vim.api.nvim_buf_set_extmark, 0, ns, row - 1, col, {
-            virt_text = { { text, "Comment" } },
+            virt_text = { { text:gsub(" ", "·"), "Comment" } },
             virt_text_pos = "overlay",
         })
     end
