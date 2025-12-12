@@ -53,4 +53,13 @@ function M.overlap(a, b)
     return a:sub(1, #a - ol), a:sub(#a - ol + 1), b:sub(ol + 1)
 end
 
+---@param bufnr integer
+---@param root string?
+---@return string
+function M.relative_path(bufnr, root)
+    local cwd = root or vim.fn.getcwd()
+    local fullpath = vim.api.nvim_buf_get_name(bufnr)
+    return fullpath:sub(#cwd + 2)
+end
+
 return M

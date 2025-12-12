@@ -2,13 +2,19 @@ local M = {}
 
 local async = require "quickfill.async"
 local config = require "quickfill.config"
+local utils = require "quickfill.utils"
+
+local git_root = vim.fs.root(0, ".git")
 
 ---@type table<quickfill.ExtraChunk>
 local chunks = {}
 
 ---@param text string
+---@return string
 local function trim(text)
-    return text:gsub("^%s+", ""):gsub("^\t+", "")
+    text = text:gsub("^%s+", "")
+    text = text:gsub("^\t+", "")
+    return text
 end
 
 ---@param lines1 table<string>
@@ -47,6 +53,14 @@ function M.try_add_chunk(buf, row)
         return
     end
 
+    if git_root then
+        local relative_path = utils.relative_path(buf, git_root)
+        local obj = vim.system({ "git", "check-ignore", relative_path }):wait()
+        if #obj.stdout > 0 then
+            return
+        end
+    end
+
     local chunk_start = row - config.CHUNK_SIZE / 2 - 1
     local chunk_end = row + config.CHUNK_SIZE / 2
 
@@ -63,9 +77,13 @@ function M.try_add_chunk(buf, row)
     assert(chunk_start < chunk_end)
 
     local lines = vim.api.nvim_buf_get_lines(buf, chunk_start, chunk_end, false)
-    lines = vim.tbl_filter(function(line)
-        return #trim(line) > 0
-    end, lines)
+    local clean = {}
+    for _, line in ipairs(lines) do
+        if #trim(line) > 0 then
+            clean[#clean + 1] = line:sub(1, 256)
+        end
+    end
+    lines = clean
 
     -- skip small chunks
     if #lines < 5 then
@@ -74,7 +92,7 @@ function M.try_add_chunk(buf, row)
 
     ---@type quickfill.ExtraChunk
     local new_chunk = {
-        filename = vim.api.nvim_buf_get_name(buf),
+        filename = utils.relative_path(buf, git_root),
         lines = lines,
     }
 
