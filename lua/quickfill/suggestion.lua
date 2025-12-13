@@ -1,6 +1,7 @@
 local M = {}
 
 local utils = require "quickfill.utils"
+local logger = require "quickfill.logger"
 
 local ns = vim.api.nvim_create_namespace "user.ai"
 
@@ -45,19 +46,17 @@ function M.accept()
     vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
     vim.api.nvim_win_set_cursor(0, { row, col + #suggestion })
 
+    logger.info("suggestion accept", { suggestion = suggestion, row = row, col = col })
+
     M.clear()
     suggestion = ""
 end
 
 function M.accept_word()
-    if #suggestion == 0 then
-        return
-    end
+    if #suggestion == 0 then return end
     local match = suggestion:match "^.-[%a%d_]+"
     local word = match or suggestion
-    if #word == 0 then
-        return
-    end
+    if #word == 0 then return end
 
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]
@@ -66,6 +65,8 @@ function M.accept_word()
     local new_text = utils.overlap(word, suffix)
     vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
     vim.api.nvim_win_set_cursor(0, { row, col + #word })
+
+    logger.info("suggestion accept word", { word = word, row = row, col = col })
 
     suggestion = suggestion:sub(#word + 1)
 

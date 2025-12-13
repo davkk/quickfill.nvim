@@ -6,6 +6,7 @@ local config = require "quickfill.config"
 local cache = require "quickfill.cache"
 local suggestion = require "quickfill.suggestion"
 local extra = require "quickfill.extra"
+local logger = require "quickfill.logger"
 
 ---@type uv.uv_process_t?
 local handle = nil
@@ -98,6 +99,8 @@ end
 ---@param code number
 local function on_stream_end(code)
     if code ~= 0 then
+        -- TODO: more info about error?
+        logger.error("request llama infill, curl error", { code = code })
         vim.schedule(function()
             vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
         end)
@@ -175,6 +178,11 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
         local sug = suggestion.get()
         if #sug == 0 then return end
 
+        logger.info(
+            "request llama infill, stream stop",
+            { req_id = req_id, suggestion = sug, speculative = speculative ~= nil }
+        )
+
         vim.schedule(function()
             if speculative and #speculative > 0 then
                 local _, _, suffix = utils.overlap(speculative, sug)
@@ -189,6 +197,10 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
     end)
 
     local payload = build_infill_payload(local_context, lsp_context, lsp_clients)
+    logger.info(
+        "request llama infill, stream start",
+        { req_id = req_id, prompt = local_context.middle, speculative = speculative ~= nil }
+    )
     stdin:write(payload, function()
         stdin:close()
     end)
@@ -203,6 +215,7 @@ end, 50)
 ---@param payload string
 function M.request_json(route, payload)
     return function(resume)
+        logger.info("request llama", { route = route })
         vim.system({
             "curl",
             ("%s/%s"):format(config.URL, route),
@@ -214,8 +227,10 @@ function M.request_json(route, payload)
             "@-",
         }, { stdin = payload }, function(result)
             if result.code == 0 then
+                logger.info("request llama", { route = route, code = result.code })
                 resume(nil, vim.json.decode(result.stdout))
             else
+                logger.error("request llama", { route = route, error = result.stderr, code = result.code })
                 resume(result.stderr)
             end
         end)

@@ -72,9 +72,7 @@ vim.api.nvim_create_user_command("AI", function()
                 end
 
                 local new_middle = local_context.middle:sub(1, #local_context.middle - i)
-                if #new_middle == 0 then
-                    break
-                end
+                if #new_middle == 0 then break end
 
                 local new_context = {
                     prefix = local_context.prefix,
@@ -86,31 +84,23 @@ vim.api.nvim_create_user_command("AI", function()
                     local removed = local_context.middle:sub(#local_context.middle - i + 1)
                     if hit:sub(1, #removed) == removed then
                         local remain = hit:sub(#removed + 1)
-                        if #remain > #best then
-                            best = remain
-                        end
+                        if #remain > #best then best = remain end
                     end
                 end
             end
 
             if #best > 0 and not suggestion.is_active() then
-                if request_id ~= request.latest_id() then
-                    return
-                end
+                if request_id ~= request.latest_id() then return end
                 suggestion.show(best, row, col)
                 return
             end
 
             local buf = vim.api.nvim_get_current_buf()
             async.async(function()
-                if request_id ~= request.latest_id() then
-                    return
-                end
+                if request_id ~= request.latest_id() then return end
                 local lsp_context = context.get_lsp_context(buf, local_context.middle)
                 vim.schedule(function()
-                    if request_id ~= request.latest_id() then
-                        return
-                    end
+                    if request_id ~= request.latest_id() then return end
                     request.request_infill(request_id, local_context, lsp_context)
                 end)
             end)()

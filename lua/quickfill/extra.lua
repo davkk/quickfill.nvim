@@ -3,6 +3,7 @@ local M = {}
 local async = require "quickfill.async"
 local config = require "quickfill.config"
 local utils = require "quickfill.utils"
+local logger = require "quickfill.logger"
 
 local git_root = vim.fs.root(0, ".git")
 
@@ -27,9 +28,7 @@ local function similarity(lines1, lines2)
         inter[val] = true
     end
     for _, val in ipairs(lines2) do
-        if inter[val] then
-            common = common + 1
-        end
+        if inter[val] then common = common + 1 end
     end
     return 2 * common / (#lines1 + #lines2)
 end
@@ -49,14 +48,13 @@ end
 ---@param buf number
 ---@param row number
 function M.try_add_chunk(buf, row)
-    if vim.bo.readonly or vim.bo.buftype ~= "" then
-        return
-    end
+    if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
     if git_root then
         local relative_path = utils.relative_path(buf, git_root)
         local obj = vim.system({ "git", "check-ignore", relative_path }):wait()
         if #obj.stdout > 0 then
+            logger.warn("file in gitignore", { buf = buf })
             return
         end
     end
@@ -79,16 +77,12 @@ function M.try_add_chunk(buf, row)
     local lines = vim.api.nvim_buf_get_lines(buf, chunk_start, chunk_end, false)
     local clean = {}
     for _, line in ipairs(lines) do
-        if #trim(line) > 0 then
-            clean[#clean + 1] = line:sub(1, 256)
-        end
+        if #trim(line) > 0 then clean[#clean + 1] = line:sub(1, 256) end
     end
     lines = clean
 
     -- skip small chunks
-    if #lines < 5 then
-        return
-    end
+    if #lines < 5 then return end
 
     ---@type quickfill.ExtraChunk
     local new_chunk = {
@@ -98,15 +92,19 @@ function M.try_add_chunk(buf, row)
 
     -- TODO: chunks should have unique lines between them
     for idx, chunk in ipairs(chunks) do
-        if similarity(lines, chunk.lines) > 0.55 then
+        local sim = similarity(lines, chunk.lines)
+        if sim > 0.55 then
+            logger.info("extra remove chunk", { idx = idx, sim = sim })
             table.remove(chunks, idx)
         end
     end
 
     if #chunks + 1 > config.MAX_EXTRAS then
+        logger.info "extra chunks full, remove first chunk"
         table.remove(chunks, 1)
     end
     chunks[#chunks + 1] = new_chunk
+    logger.info("extra add chunk", { idx = #chunks })
 
     local input_extra = M.get_input_extra()
 

@@ -3,6 +3,7 @@ local M = {}
 local config = require "quickfill.config"
 local async = require "quickfill.async"
 local request = require "quickfill.request"
+local logger = require "quickfill.logger"
 
 ---@return quickfill.LocalContext
 function M.get_local_context()
@@ -19,6 +20,11 @@ function M.get_local_context()
         .. table.concat(lines, "\n", math.min(#lines + 1, row + 1), math.min(#lines, row + config.N_SUFFIX + 1))
         .. "\n"
 
+    logger.info("context local", {
+        prefix = prefix:sub(-10):gsub("\n", "\\n"),
+        middle = curr_prefix:gsub("\n", "\\n"),
+        suffix = suffix:sub(1, 10):gsub("\n", "\\n"),
+    })
     return { prefix = prefix, middle = curr_prefix, suffix = suffix }
 end
 
@@ -36,17 +42,23 @@ end
 ---@param params table
 local function lsp_request(buf, method, params)
     return vim.schedule_wrap(function(resume)
+        logger.info("context lsp", { buf = buf, method = method, params = params })
+
         if not is_supported(buf, method) then
+            logger.warn("context lsp, buffer does not support method", { buf = buf, method = method, params = params })
             resume {}
             return
         end
+
         local done = false
-        local timer = vim.uv.new_timer() ---@cast timer uv.uv_timer_t
+        local timer = assert(vim.uv.new_timer(), "failed to create timer")
+
         local cancel_lsp_req = vim.lsp.buf_request_all(buf, method, params, function(results)
             if not done then
                 done = true
                 timer:stop()
                 timer:close()
+                logger.info("context lsp", { method = method, results = results, params = params })
                 resume(results)
             end
         end)
@@ -56,6 +68,7 @@ local function lsp_request(buf, method, params)
                 vim.schedule(cancel_lsp_req)
                 timer:stop()
                 timer:close()
+                logger.warn("context lsp timeout", { buf = buf, method = method, params = params })
                 resume {}
             end
         end)
@@ -94,10 +107,12 @@ function M.get_lsp_context(buf, line, row, col)
     local signatures = {}
     for _, resp in ipairs(sig_resp) do
         if resp.err then
+            logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
             vim.notify(("error while lsp signature help: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
             break
         end
         if resp.result then
+            logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params })
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
                 if sig.label then signature[#signature + 1] = sig.label end
@@ -111,10 +126,12 @@ function M.get_lsp_context(buf, line, row, col)
     local cmp_items = {}
     for _, resp in ipairs(cmp_resp) do
         if resp.err then
+            logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
             vim.notify(("error while lsp completion: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
             break
         end
         if resp.result then
+            logger.info("context lsp", { buf = buf, method = "completion", params = params })
             for _, item in ipairs(resp.result.items or resp.result or {}) do
                 cmp_items[#cmp_items + 1] = item
             end
