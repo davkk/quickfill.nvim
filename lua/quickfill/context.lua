@@ -23,18 +23,20 @@ function M.get_local_context()
 end
 
 ---@param method string
+---@return boolean
+local function is_supported(buf, method)
+    for _, client in ipairs(vim.lsp.get_clients { bufnr = buf }) do
+        if client:supports_method(method) then return true end
+    end
+    return false
+end
+
+---@param method string
 ---@param buf number
 ---@param params table
 local function lsp_request(buf, method, params)
     return vim.schedule_wrap(function(resume)
-        local supported = false
-        for _, client in ipairs(vim.lsp.get_clients { bufnr = 0 }) do
-            if client:supports_method(method) then
-                supported = true
-                break
-            end
-        end
-        if not supported then
+        if not is_supported(buf, method) then
             resume {}
             return
         end
@@ -48,7 +50,7 @@ local function lsp_request(buf, method, params)
                 resume(results)
             end
         end)
-        timer:start(500, 0, function()
+        timer:start(200, 0, function()
             if not done then
                 done = true
                 vim.schedule(cancel_lsp_req)
@@ -60,9 +62,23 @@ local function lsp_request(buf, method, params)
     end)
 end
 
+---@return boolean
 local function is_function(kind)
     return kind == vim.lsp.protocol.CompletionItemKind.Function --
         or kind == vim.lsp.protocol.CompletionItemKind.Method
+end
+
+---@param buf number
+---@param row number?
+---@param col number?
+local function get_params(buf, row, col)
+    if row and col then
+        return {
+            textDocument = { uri = vim.uri_from_bufnr(buf) },
+            position = { line = row - 1, character = col },
+        }
+    end
+    return vim.lsp.util.make_position_params(0, "utf-8")
 end
 
 ---@param buf number
@@ -71,15 +87,7 @@ end
 ---@param col number?
 ---@return quickfill.LspContext
 function M.get_lsp_context(buf, line, row, col)
-    local params
-    if row and col then
-        params = {
-            textDocument = { uri = vim.uri_from_bufnr(buf) },
-            position = { line = row - 1, character = col },
-        }
-    else
-        params = vim.lsp.util.make_position_params(0, "utf-8")
-    end
+    local params = get_params(buf, row, col)
 
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.SignatureHelp, context: lsp.HandlerContext }>
     local sig_resp = async.await(lsp_request(buf, "textDocument/signatureHelp", params)) or {}
@@ -92,9 +100,7 @@ function M.get_lsp_context(buf, line, row, col)
         if resp.result then
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
-                if sig.label then
-                    signature[#signature + 1] = sig.label
-                end
+                if sig.label then signature[#signature + 1] = sig.label end
                 signatures[#signatures + 1] = table.concat(signature, "\n")
             end
         end
@@ -124,23 +130,15 @@ function M.get_lsp_context(buf, line, row, col)
 
     local num_items = 0
     for _, v in ipairs(cmp_items) do
-        if num_items > 20 then
-            break
-        end
+        if num_items > 20 then break end
         if v.kind ~= vim.lsp.protocol.CompletionItemKind.Snippet and v.label:sub(1, #keyword) == keyword then
             local label = ("%s %s"):format(vim.lsp.protocol.CompletionItemKind[v.kind]:lower(), v.label)
-            if is_function(v.kind) and not label:match "%(" then
-                label = label .. "("
-            end
-            if v.detail then
-                label = ("%s -> %s"):format(label, v.detail)
-            end
+            if is_function(v.kind) and not label:match "%(" then label = label .. "(" end
+            if v.detail then label = ("%s -> %s"):format(label, v.detail) end
             completions[#completions + 1] = label
 
             local content = (v.filterText or v.insertText or v.label):gsub("^%.", ""):sub(#keyword + 1)
-            if is_function(v.kind) and not content:match "%(" then
-                content = content .. "("
-            end
+            if is_function(v.kind) and not content:match "%(" then content = content .. "(" end
             tokenize[#tokenize + 1] = content
 
             num_items = num_items + 1
@@ -154,16 +152,12 @@ function M.get_lsp_context(buf, line, row, col)
             with_pieces = true,
         }
     ))
-    if err ~= nil then
-        return {}
-    end
+    if err ~= nil then return {} end
 
     local logit_bias = {}
     for _, token in ipairs(tokenize_resp.tokens or {}) do
         local piece = token.piece
-        if not logit_bias[piece] then
-            logit_bias[piece] = 3
-        end
+        if not logit_bias[piece] then logit_bias[piece] = 3 end
     end
 
     return {
