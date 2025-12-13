@@ -49,7 +49,7 @@ end
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param speculative? string
-function M.request_infill(req_id, local_context, lsp_context, speculative)
+M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, speculative)
     if vim.bo.readonly or vim.bo.buftype ~= "" then
         return
     end
@@ -131,9 +131,9 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
             end)
             return
         end
-        if #suggestion.get() > 0 then
+        local sug = suggestion.get()
+        if #sug > 0 then
             vim.schedule(function()
-                local sug = suggestion.get()
                 if speculative and #speculative > 0 then
                     local _, _, suffix = utils.overlap(speculative, sug)
                     sug = suffix
@@ -142,7 +142,6 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
             end)
         end
         if not speculative then
-            local sug = suggestion.get()
             local new_line = local_context.middle .. sug
             local new_local_context = {
                 prefix = local_context.prefix,
@@ -180,7 +179,7 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
             end
         end)
     end
-end
+end, 50)
 
 ---@param chunk string
 ---@param req_id number

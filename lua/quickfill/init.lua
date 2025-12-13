@@ -66,7 +66,7 @@ vim.api.nvim_create_user_command("AI", function()
             local cached = cache.cache_get(local_context)
 
             for i = 1, 64 do
-                if cached then
+                if cached and not suggestion.is_active() then
                     best = cached
                     break
                 end
@@ -93,7 +93,7 @@ vim.api.nvim_create_user_command("AI", function()
                 end
             end
 
-            if #best > 0 then
+            if #best > 0 and not suggestion.is_active() then
                 if request_id ~= request.latest_id() then
                     return
                 end
