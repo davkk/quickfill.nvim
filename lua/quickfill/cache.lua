@@ -17,7 +17,7 @@ end
 ---@param context quickfill.LocalContext
 ---@param value string
 function M.cache_add(context, value)
-    if vim.tbl_count(cache) > config.MAX_CACHE - 1 then
+    if vim.tbl_count(cache) > config.max_cache_entries - 1 then
         local least_used = lru[1]
         logger.info(
             "cache full, removing cache entry",

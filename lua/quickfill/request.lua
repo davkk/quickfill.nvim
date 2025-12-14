@@ -37,10 +37,12 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
     if lsp_context.completions then input_extra[#input_extra + 1] = { text = lsp_context.completions } end
     if lsp_context.signatures then input_extra[#input_extra + 1] = { text = lsp_context.signatures } end
 
-    local stop = utils.tbl_copy(config.STOP_CHARS)
-    for _, client in ipairs(lsp_clients) do
-        for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do
-            if char ~= " " and not vim.tbl_contains(stop, char) then stop[#stop + 1] = char end
+    local stop = utils.tbl_copy(config.stop_chars)
+    if config.stop_on_stop_char then
+        for _, client in ipairs(lsp_clients) do
+            for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do
+                if char ~= " " and not vim.tbl_contains(stop, char) then stop[#stop + 1] = char end
+            end
         end
     end
 
@@ -50,11 +52,11 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
         input_suffix = local_context.suffix,
         input_extra = input_extra,
         cache_prompt = true,
-        max_tokens = config.MAX_TOKENS,
-        n_predict = config.MAX_TOKENS,
-        top_k = 40,
-        top_p = 0.5,
-        repeat_penalty = 1.3,
+        max_tokens = config.n_predict,
+        n_predict = config.n_predict,
+        top_k = config.top_k,
+        top_p = config.top_p,
+        repeat_penalty = config.repeat_penalty,
         samplers = { "top_k", "top_p", "infill" },
         logit_bias = lsp_context.logit_bias,
         t_max_predict_ms = 500,
@@ -98,7 +100,11 @@ local function request_infill_speculative(req_id, local_context, lsp_clients, su
         local new_lsp_context = context.get_lsp_context(temp_buf, new_line, row, col)
         vim.schedule(function()
             M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
-            vim.api.nvim_buf_delete(temp_buf, { force = true })
+
+            for _, client in ipairs(lsp_clients) do
+                vim.lsp.buf_detach_client(temp_buf, client.id)
+            end
+            vim.api.nvim_buf_delete(temp_buf, { force = true, unload = true })
         end)
     end)()
 end
@@ -137,8 +143,8 @@ local function on_stream_read(chunk, req_id, row, col)
     if not ok then return end
 
     local text = resp.content
-    if resp.stop then
-        if resp.stop_type ~= "word" or vim.tbl_contains(config.STOP_CHARS, resp.stopping_word) then return end
+    if config.stop_on_stop_char and resp.stop then
+        if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return end
         text = resp.stopping_word
     end
     vim.schedule(function()
@@ -152,7 +158,7 @@ end
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param speculative? string
-M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, speculative)
+function M.request_infill(req_id, local_context, lsp_context, speculative)
     if req_id ~= request_id then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
@@ -169,7 +175,7 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
 
     handle = vim.uv.spawn("curl", {
         args = {
-            ("%s/infill"):format(config.URL),
+            ("%s/infill"):format(config.url),
             "--no-buffer",
             "--request",
             "POST",
@@ -202,7 +208,7 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
             end
             cache.cache_add(local_context, sug)
 
-            if not speculative then
+            if config.stop_on_stop_char and not speculative then
                 request_infill_speculative(req_id, local_context, lsp_clients, suggestion.get(), row, col + #sug)
             end
         end)
@@ -221,7 +227,7 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
         if not chunk then return end
         on_stream_read(chunk, req_id, row, col)
     end)
-end, 50)
+end
 
 ---@param route string
 ---@param payload string
@@ -230,7 +236,7 @@ function M.request_json(route, payload)
         logger.info("request llama", { route = route })
         vim.system({
             "curl",
-            ("%s/%s"):format(config.URL, route),
+            ("%s/%s"):format(config.url, route),
             "-X",
             "POST",
             "-H",

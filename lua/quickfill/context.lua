@@ -11,13 +11,13 @@ function M.get_local_context()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
-    local prefix = table.concat(lines, "\n", math.max(0, row - 1 - config.N_PREFIX) + 1, math.max(0, row - 1)) .. "\n"
+    local prefix = table.concat(lines, "\n", math.max(0, row - 1 - config.n_prefix) + 1, math.max(0, row - 1)) .. "\n"
     local curr_prefix = lines[row]:sub(1, col)
 
     local curr_suffix = lines[row]:sub(col + 1)
     local suffix = (#curr_suffix > 0 and curr_suffix .. "\n" or "")
         .. "\n"
-        .. table.concat(lines, "\n", math.min(#lines + 1, row + 1), math.min(#lines, row + config.N_SUFFIX + 1))
+        .. table.concat(lines, "\n", math.min(#lines + 1, row + 1), math.min(#lines, row + config.n_suffix + 1))
         .. "\n"
 
     logger.info("context local", {
@@ -58,7 +58,10 @@ local function lsp_request(buf, method, params)
                 done = true
                 timer:stop()
                 timer:close()
-                logger.info("context lsp receive", { buf = buf, method = method, params = params })
+                logger.info(
+                    "context lsp receive",
+                    { buf = buf, method = method, params = params, results = results }
+                )
                 resume(results)
             end
         end)
@@ -102,79 +105,88 @@ end
 function M.get_lsp_context(buf, line, row, col)
     local params = get_params(buf, row, col)
 
-    ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.SignatureHelp, context: lsp.HandlerContext }>
-    local sig_resp = async.await(lsp_request(buf, "textDocument/signatureHelp", params)) or {}
     local signatures = {}
-    for _, resp in ipairs(sig_resp) do
-        if resp.err then
-            logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
-            vim.notify(("error while lsp signature help: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
-            break
-        end
-        if resp.result then
-            logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params, result = resp.result })
-            for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
-                local signature = {}
-                if sig.label then signature[#signature + 1] = sig.label end
-                signatures[#signatures + 1] = table.concat(signature, "\n")
+    if config.lsp_signature_help then
+        ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.SignatureHelp, context: lsp.HandlerContext }>
+        local sig_resp = async.await(lsp_request(buf, "textDocument/signatureHelp", params)) or {}
+        for _, resp in ipairs(sig_resp) do
+            if resp.err then
+                logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
+                vim.notify(
+                    ("error while lsp signature help: %s"):format(resp.err.message),
+                    vim.diagnostic.severity.ERROR
+                )
+                break
+            end
+            if resp.result then
+                logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params })
+                for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
+                    local signature = {}
+                    if sig.label then signature[#signature + 1] = sig.label end
+                    signatures[#signatures + 1] = table.concat(signature, "\n")
+                end
             end
         end
     end
 
-    ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.CompletionList, context: lsp.HandlerContext }>
-    local cmp_resp = async.await(lsp_request(buf, "textDocument/completion", params)) or {}
-    local cmp_items = {}
-    for _, resp in ipairs(cmp_resp) do
-        if resp.err then
-            logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
-            vim.notify(("error while lsp completion: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
-            break
-        end
-        if resp.result then
-            logger.info("context lsp", { buf = buf, method = "completion", params = params, result = resp.result })
-            for _, item in ipairs(resp.result.items or resp.result or {}) do
-                cmp_items[#cmp_items + 1] = item
-            end
-        end
-    end
-
-    local re = vim.regex [[\k*$]]
-    local s, e = re:match_str(line)
-    local keyword = s and line:sub(s + 1, e) or ""
-
-    local completions = {}
     local tokenize = {}
+    local completions = {}
 
-    local num_items = 0
-    for _, v in ipairs(cmp_items) do
-        if num_items > 20 then break end
-        if v.kind ~= vim.lsp.protocol.CompletionItemKind.Snippet and v.label:sub(1, #keyword) == keyword then
-            local label = ("%s %s"):format(vim.lsp.protocol.CompletionItemKind[v.kind]:lower(), v.label)
-            if is_function(v.kind) and not label:match "%(" then label = label .. "(" end
-            if v.detail then label = ("%s -> %s"):format(label, v.detail) end
-            completions[#completions + 1] = label
+    if config.lsp_completion then
+        ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.CompletionList, context: lsp.HandlerContext }>
+        local cmp_resp = async.await(lsp_request(buf, "textDocument/completion", params)) or {}
+        local cmp_items = {}
+        for _, resp in ipairs(cmp_resp) do
+            if resp.err then
+                logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
+                vim.notify(("error while lsp completion: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
+                break
+            end
+            if resp.result then
+                logger.info("context lsp", { buf = buf, method = "completion", params = params })
+                for _, item in ipairs(resp.result.items or resp.result or {}) do
+                    cmp_items[#cmp_items + 1] = item
+                end
+            end
+        end
 
-            local content = (v.filterText or v.insertText or v.label):gsub("^%.", ""):sub(#keyword + 1)
-            if is_function(v.kind) and not content:match "%(" then content = content .. "(" end
-            tokenize[#tokenize + 1] = content
+        local re = vim.regex [[\k*$]]
+        local s, e = re:match_str(line)
+        local keyword = s and line:sub(s + 1, e) or ""
 
-            num_items = num_items + 1
+        local num_items = 0
+        for _, v in ipairs(cmp_items) do
+            if num_items > config.max_lsp_completion_items then break end
+            if v.kind ~= vim.lsp.protocol.CompletionItemKind.Snippet and v.label:sub(1, #keyword) == keyword then
+                local label = ("%s %s"):format(vim.lsp.protocol.CompletionItemKind[v.kind]:lower(), v.label)
+                if is_function(v.kind) and not label:match "%(" then label = label .. "(" end
+                if v.detail then label = ("%s -> %s"):format(label, v.detail) end
+                completions[#completions + 1] = label
+
+                local content = (v.filterText or v.insertText or v.label):gsub("^%.", ""):sub(#keyword + 1)
+                if is_function(v.kind) and not content:match "%(" then content = content .. "(" end
+                tokenize[#tokenize + 1] = content
+
+                num_items = num_items + 1
+            end
         end
     end
-
-    local err, tokenize_resp = async.await(request.request_json(
-        "tokenize",
-        vim.json.encode {
-            content = tokenize,
-            with_pieces = true,
-        }
-    ))
-    if err ~= nil then return {} end
 
     local logit_bias = {}
-    for _, token in ipairs(tokenize_resp.tokens or {}) do
-        local piece = token.piece
-        if not logit_bias[piece] then logit_bias[piece] = 3 end
+    if #tokenize > 0 then
+        local err, tokenize_resp = async.await(request.request_json(
+            "tokenize",
+            vim.json.encode {
+                content = tokenize,
+                with_pieces = true,
+            }
+        ))
+        if err ~= nil then return {} end
+
+        for _, token in ipairs(tokenize_resp.tokens or {}) do
+            local piece = token.piece
+            if not logit_bias[piece] then logit_bias[piece] = 3 end
+        end
     end
 
     return {

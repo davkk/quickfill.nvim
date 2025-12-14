@@ -22,7 +22,7 @@ local function stringify_table(data)
         if type(v) == "table" then
             v = vim.inspect(v, { newline = "", depth = 3 })
         elseif type(v) == "string" then
-            v = string.format('\'%s\'', v)
+            v = string.format("'%s'", v)
         else
             v = tostring(v)
         end
@@ -35,7 +35,8 @@ end
 --- @param msg string
 --- @param data table?
 function M.log(level, msg, data)
-    local timestamp = os.date "%Y-%m-%d %H:%M:%S"
+    local _, b = math.modf(os.clock())
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S.", os.time()) .. tostring(b):sub(3, 5)
     local level_str = levels[level]
     local line = string.format("[%s] [%s] %s { %s }\n", timestamp, level_str, msg, stringify_table(data or {}))
     local success, err = vim.uv.fs_write(fd, line)

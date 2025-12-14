@@ -18,6 +18,7 @@ local context = require "quickfill.context"
 local extra = require "quickfill.extra"
 local request = require "quickfill.request"
 local suggestion = require "quickfill.suggestion"
+local config = require "quickfill.config"
 
 local group = vim.api.nvim_create_augroup("ai", { clear = true })
 
@@ -118,6 +119,7 @@ vim.api.nvim_create_user_command("AI", function()
     vim.api.nvim_create_autocmd({ "CursorHold", "BufWritePost" }, {
         group = group,
         callback = function(ev)
+            if not config.extra_chunks then return end
             local row = unpack(vim.api.nvim_win_get_cursor(0))
             extra.try_add_chunk(ev.buf, row)
         end,

@@ -48,6 +48,7 @@ end
 ---@param buf number
 ---@param row number
 function M.try_add_chunk(buf, row)
+    if not config.extra_chunks then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
     if git_root then
@@ -59,8 +60,8 @@ function M.try_add_chunk(buf, row)
         end
     end
 
-    local chunk_start = row - config.CHUNK_SIZE / 2 - 1
-    local chunk_end = row + config.CHUNK_SIZE / 2
+    local chunk_start = row - config.chunk_lines / 2 - 1
+    local chunk_end = row + config.chunk_lines / 2
 
     local max_line_nr = vim.api.nvim_buf_line_count(buf)
 
@@ -99,7 +100,7 @@ function M.try_add_chunk(buf, row)
         end
     end
 
-    if #chunks + 1 > config.MAX_EXTRAS then
+    if #chunks + 1 > config.max_extra_chunks then
         logger.info "extra chunks full, remove first chunk"
         table.remove(chunks, 1)
     end

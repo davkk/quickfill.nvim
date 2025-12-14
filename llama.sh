@@ -15,5 +15,6 @@ llama-server \
     --host $host \
     --port $port
 
+# -hf ibm-granite/granite-4.0-350m-GGUF:Q8_0 \
 # --batch-size 2048 \
 # --ubatch-size 512 \
