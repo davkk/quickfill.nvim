@@ -81,6 +81,7 @@ local function request_infill_speculative(req_id, local_context, lsp_clients, su
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
     lines[row] = new_line
     vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
+
     local filename = vim.api.nvim_buf_get_name(0)
     local parts = vim.split(filename, ".", { plain = true })
     local ext = parts[#parts] or "tmp"
@@ -191,8 +192,13 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
 
         vim.schedule(function()
             if speculative and #speculative > 0 then
-                local _, _, suffix = utils.overlap(speculative, sug)
-                sug = suffix
+                local pre_line, _, suf_sug = utils.overlap(speculative, sug)
+                cache.cache_add({
+                    prefix = local_context.prefix,
+                    middle = pre_line,
+                    suffix = local_context.suffix,
+                }, sug)
+                sug = suf_sug
             end
             cache.cache_add(local_context, sug)
 
