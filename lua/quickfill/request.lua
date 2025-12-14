@@ -81,14 +81,16 @@ local function request_infill_speculative(req_id, local_context, lsp_clients, su
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
     lines[row] = new_line
     vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
+    vim.bo[temp_buf].buftype = "nofile"
+    vim.bo[temp_buf].bufhidden = "wipe"
+    vim.bo[temp_buf].filetype = vim.bo.filetype
 
     async.async(function()
         local context = require "quickfill.context"
         for _, client in ipairs(lsp_clients) do
             vim.lsp.buf_attach_client(temp_buf, client.id)
         end
-        local new_lsp_context = context.get_lsp_context(temp_buf, new_line, row, col + #new_line - 1)
-
+        local new_lsp_context = context.get_lsp_context(temp_buf, new_line, row, col)
         vim.schedule(function()
             M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
             vim.api.nvim_buf_delete(temp_buf, { force = true })
@@ -191,7 +193,7 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
             cache.cache_add(local_context, sug)
 
             if not speculative then
-                request_infill_speculative(req_id, local_context, lsp_clients, suggestion.get(), row, col)
+                request_infill_speculative(req_id, local_context, lsp_clients, suggestion.get(), row, col + #sug)
             end
         end)
     end)

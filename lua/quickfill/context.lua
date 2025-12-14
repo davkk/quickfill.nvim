@@ -58,7 +58,7 @@ local function lsp_request(buf, method, params)
                 done = true
                 timer:stop()
                 timer:close()
-                logger.info("context lsp", { method = method, results = results, params = params })
+                logger.info("context lsp", { method = method, results = vim.json.encode(results), params = params })
                 resume(results)
             end
         end)
