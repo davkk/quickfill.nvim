@@ -81,9 +81,13 @@ local function request_infill_speculative(req_id, local_context, lsp_clients, su
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
     lines[row] = new_line
     vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
-    vim.bo[temp_buf].buftype = "nofile"
-    vim.bo[temp_buf].bufhidden = "wipe"
-    vim.bo[temp_buf].filetype = vim.bo.filetype
+    local filename = vim.api.nvim_buf_get_name(0)
+    local parts = vim.split(filename, ".", { plain = true })
+    local ext = parts[#parts] or "tmp"
+
+    local ft = vim.api.nvim_get_option_value("filetype", { buf = 0 })
+    vim.api.nvim_buf_set_name(temp_buf, ("%s.%s"):format(vim.fn.sha256(filename), ext))
+    vim.api.nvim_set_option_value("filetype", ft, { buf = temp_buf })
 
     async.async(function()
         local context = require "quickfill.context"

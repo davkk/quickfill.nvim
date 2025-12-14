@@ -42,7 +42,7 @@ end
 ---@param params table
 local function lsp_request(buf, method, params)
     return vim.schedule_wrap(function(resume)
-        logger.info("context lsp", { buf = buf, method = method, params = params })
+        logger.info("context lsp send", { buf = buf, method = method, params = params })
 
         if not is_supported(buf, method) then
             logger.warn("context lsp, buffer does not support method", { buf = buf, method = method, params = params })
@@ -58,7 +58,7 @@ local function lsp_request(buf, method, params)
                 done = true
                 timer:stop()
                 timer:close()
-                logger.info("context lsp", { method = method, results = vim.json.encode(results), params = params })
+                logger.info("context lsp receive", { buf = buf, method = method, params = params })
                 resume(results)
             end
         end)
@@ -112,7 +112,7 @@ function M.get_lsp_context(buf, line, row, col)
             break
         end
         if resp.result then
-            logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params })
+            logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params, result = resp.result })
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
                 if sig.label then signature[#signature + 1] = sig.label end
@@ -131,7 +131,7 @@ function M.get_lsp_context(buf, line, row, col)
             break
         end
         if resp.result then
-            logger.info("context lsp", { buf = buf, method = "completion", params = params })
+            logger.info("context lsp", { buf = buf, method = "completion", params = params, result = resp.result })
             for _, item in ipairs(resp.result.items or resp.result or {}) do
                 cmp_items[#cmp_items + 1] = item
             end
