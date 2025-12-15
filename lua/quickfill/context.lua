@@ -85,25 +85,11 @@ local function is_function(kind)
 end
 
 ---@param buf number
----@param row number?
----@param col number?
-local function get_params(buf, row, col)
-    if row and col then
-        return {
-            textDocument = { uri = vim.uri_from_bufnr(buf) },
-            position = { line = row - 1, character = col },
-        }
-    end
-    return vim.lsp.util.make_position_params(0, "utf-8")
-end
-
----@param buf number
 ---@param line string
----@param row number?
----@param col number?
+---@param params lsp.TextDocumentPositionParams?
 ---@return quickfill.LspContext
-function M.get_lsp_context(buf, line, row, col)
-    local params = get_params(buf, row, col)
+function M.get_lsp_context(buf, line, params)
+    params = params or vim.lsp.util.make_position_params(0, "utf-8")
 
     local signatures = {}
     if config.lsp_signature_help then

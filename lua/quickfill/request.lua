@@ -65,46 +65,54 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
     }
 end
 
+---@param buf number
+---@param row number
+---@param text string
+local function notify_line_change(buf, row, text)
+    local clients = vim.lsp.get_clients { bufnr = buf }
+    for _, client in ipairs(clients) do
+        client:notify("textDocument/didChange", {
+            textDocument = {
+                uri = vim.uri_from_bufnr(buf),
+                version = vim.lsp.util.buf_versions[buf] + 1,
+            },
+            contentChanges = {
+                {
+                    range = {
+                        start = { line = row - 1, character = 0 },
+                        ["end"] = {
+                            line = row - 1,
+                            character = vim.lsp.util.character_offset(buf, row - 1, #text, "utf-16"),
+                        },
+                    },
+                    text = text,
+                },
+            },
+        })
+    end
+end
+
+---@param buf number
 ---@param req_id number
 ---@param local_context quickfill.LocalContext
----@param lsp_clients vim.lsp.Client[]
 ---@param sug string
 ---@param row number
 ---@param col number
-local function request_infill_speculative(req_id, local_context, lsp_clients, sug, row, col)
+local function request_infill_speculative(buf, req_id, local_context, sug, row, col)
     local new_line = local_context.middle .. sug
     local new_local_context = {
         prefix = local_context.prefix,
         middle = new_line,
         suffix = local_context.suffix,
     }
-
-    local temp_buf = vim.api.nvim_create_buf(false, true)
-    local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-    lines[row] = new_line
-    vim.api.nvim_buf_set_lines(temp_buf, 0, -1, false, lines)
-
-    local filename = vim.api.nvim_buf_get_name(0)
-    local parts = vim.split(filename, ".", { plain = true })
-    local ext = parts[#parts] or "tmp"
-
-    local ft = vim.api.nvim_get_option_value("filetype", { buf = 0 })
-    vim.api.nvim_buf_set_name(temp_buf, ("%s.%s"):format(vim.fn.sha256(filename), ext))
-    vim.api.nvim_set_option_value("filetype", ft, { buf = temp_buf })
-
+    notify_line_change(buf, row, new_line)
     async.async(function()
-        local context = require "quickfill.context"
-        for _, client in ipairs(lsp_clients) do
-            vim.lsp.buf_attach_client(temp_buf, client.id)
-        end
-        local new_lsp_context = context.get_lsp_context(temp_buf, new_line, row, col)
+        local new_lsp_context = require("quickfill.context").get_lsp_context(buf, new_line, {
+            textDocument = { uri = vim.uri_from_bufnr(buf), version = vim.lsp.util.buf_versions[buf] },
+            position = { line = row - 1, character = col },
+        })
         vim.schedule(function()
             M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
-
-            for _, client in ipairs(lsp_clients) do
-                vim.lsp.buf_detach_client(temp_buf, client.id)
-            end
-            vim.api.nvim_buf_delete(temp_buf, { force = true, unload = true })
         end)
     end)()
 end
@@ -167,8 +175,10 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
         suggestion.clear()
     end
 
+    ---@type number, number
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local lsp_clients = vim.lsp.get_clients { bufnr = 0 }
+    local buf = vim.api.nvim_get_current_buf()
+    local lsp_clients = vim.lsp.get_clients { bufnr = buf }
 
     stdout = assert(vim.uv.new_pipe(false), "failed to create stdout pipe")
     stdin = assert(vim.uv.new_pipe(false), "failed to create stdin pipe")
@@ -199,6 +209,7 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
         vim.schedule(function()
             if speculative and #speculative > 0 then
                 local pre_line, _, suf_sug = utils.overlap(speculative, sug)
+                notify_line_change(buf, row, pre_line)
                 cache.cache_add({
                     prefix = local_context.prefix,
                     middle = pre_line,
@@ -209,7 +220,7 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
             cache.cache_add(local_context, sug)
 
             if config.stop_on_stop_char and not speculative then
-                request_infill_speculative(req_id, local_context, lsp_clients, suggestion.get(), row, col + #sug)
+                request_infill_speculative(buf, req_id, local_context, suggestion.get(), row, col + #sug)
             end
         end)
     end)
