@@ -5,6 +5,9 @@ local async = require "quickfill.async"
 local request = require "quickfill.request"
 local logger = require "quickfill.logger"
 
+---@type table<number, table<string, function>>
+local active_cancels = {}
+
 ---@return quickfill.LocalContext
 function M.get_local_context()
     local buf = vim.api.nvim_get_current_buf()
@@ -50,24 +53,31 @@ local function lsp_request(buf, method, params)
             return
         end
 
+        if active_cancels[buf] and active_cancels[buf][method] then
+            pcall(active_cancels[buf][method])
+            active_cancels[buf][method] = nil
+        end
+
         local done = false
         local timer = assert(vim.uv.new_timer(), "failed to create timer")
 
         local cancel_lsp_req = vim.lsp.buf_request_all(buf, method, params, function(results)
             if not done then
                 done = true
+                if active_cancels[buf] then active_cancels[buf][method] = nil end
                 timer:stop()
                 timer:close()
-                logger.info(
-                    "context lsp receive",
-                    { buf = buf, method = method, params = params, results = results }
-                )
+                logger.info("context lsp receive", { buf = buf, method = method, params = params, results = results })
                 resume(results)
             end
         end)
+
+        active_cancels[buf] = active_cancels[buf] or {}
+        active_cancels[buf][method] = cancel_lsp_req
         timer:start(200, 0, function()
             if not done then
                 done = true
+                if active_cancels[buf] then active_cancels[buf][method] = nil end
                 vim.schedule(cancel_lsp_req)
                 timer:stop()
                 timer:close()
