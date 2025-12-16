@@ -54,7 +54,7 @@ vim.api.nvim_create_user_command("AI", function()
 
     vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter" }, {
         group = group,
-        callback = function()
+        callback = function(ev)
             request.cancel_stream()
             suggestion.clear()
 
@@ -96,10 +96,9 @@ vim.api.nvim_create_user_command("AI", function()
                 return
             end
 
-            local buf = vim.api.nvim_get_current_buf()
             async.async(function()
                 if request_id ~= request.latest_id() then return end
-                local lsp_context = context.get_lsp_context(buf, local_context.middle)
+                local lsp_context = context.get_lsp_context(ev.buf, local_context.middle)
                 vim.schedule(function()
                     if request_id ~= request.latest_id() then return end
                     request.request_infill(request_id, local_context, lsp_context)

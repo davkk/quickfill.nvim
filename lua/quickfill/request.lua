@@ -66,27 +66,19 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
 end
 
 ---@param buf number
----@param row number
----@param text string
-local function notify_line_change(buf, row, text)
+---@param lines table<string>
+local function notify_line_change(buf, lines)
+    -- FIXME: I should be sending incremental changes and not whole buffers
+    vim.lsp.util.buf_versions[buf] = vim.lsp.util.buf_versions[buf] + 1
     local clients = vim.lsp.get_clients { bufnr = buf }
     for _, client in ipairs(clients) do
         client:notify("textDocument/didChange", {
             textDocument = {
                 uri = vim.uri_from_bufnr(buf),
-                version = vim.lsp.util.buf_versions[buf] + 1,
+                version = vim.lsp.util.buf_versions[buf],
             },
             contentChanges = {
-                {
-                    range = {
-                        start = { line = row - 1, character = 0 },
-                        ["end"] = {
-                            line = row - 1,
-                            character = vim.lsp.util.character_offset(buf, row - 1, #text, "utf-16"),
-                        },
-                    },
-                    text = text,
-                },
+                { text = table.concat(lines, "\n") },
             },
         })
     end
@@ -105,35 +97,18 @@ local function request_infill_speculative(buf, req_id, local_context, sug, row, 
         middle = new_line,
         suffix = local_context.suffix,
     }
-    notify_line_change(buf, row, new_line)
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    lines[row] = new_line
+    notify_line_change(buf, lines)
     async.async(function()
         local new_lsp_context = require("quickfill.context").get_lsp_context(buf, new_line, {
             textDocument = { uri = vim.uri_from_bufnr(buf), version = vim.lsp.util.buf_versions[buf] },
             position = { line = row - 1, character = col },
         })
         vim.schedule(function()
-            M.request_infill(req_id, new_local_context, new_lsp_context, new_line)
+            M.request_infill(req_id, new_local_context, new_lsp_context, sug)
         end)
     end)()
-end
-
----@param code number
-local function on_stream_end(code)
-    if code ~= 0 then
-        -- TODO: more info about error?
-        logger.error("request llama infill, curl error", { code = code })
-        vim.schedule(function()
-            vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
-        end)
-    end
-    if stdout then
-        stdout:close()
-        stdout = nil
-    end
-    if handle then
-        handle:close()
-        handle = nil
-    end
 end
 
 ---@param chunk string
@@ -162,22 +137,47 @@ local function on_stream_read(chunk, req_id, row, col)
     end)
 end
 
+---@param code number
+local function on_stream_end(code)
+    if code ~= 0 then
+        -- TODO: more info about error?
+        logger.error("request llama infill, curl error", { code = code })
+        vim.schedule(function()
+            vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
+        end)
+    end
+    if stdout then
+        stdout:close()
+        stdout = nil
+    end
+    if handle then
+        handle:close()
+        handle = nil
+    end
+end
+
 ---@param req_id number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param speculative? string
-function M.request_infill(req_id, local_context, lsp_context, speculative)
+M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, speculative)
     if req_id ~= request_id then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
-    if not speculative then
+    local buf = vim.api.nvim_get_current_buf()
+
+    if not speculative or #speculative == 0 then
         M.cancel_stream()
         suggestion.clear()
     end
 
+    vim.schedule(function()
+        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+        notify_line_change(buf, lines)
+    end)
+
     ---@type number, number
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local buf = vim.api.nvim_get_current_buf()
     local lsp_clients = vim.lsp.get_clients { bufnr = buf }
 
     stdout = assert(vim.uv.new_pipe(false), "failed to create stdout pipe")
@@ -207,9 +207,11 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
         )
 
         vim.schedule(function()
+            if config.stop_on_stop_char and not speculative then
+                request_infill_speculative(buf, req_id, local_context, sug, row, col + #sug)
+            end
             if speculative and #speculative > 0 then
-                local pre_line, _, suf_sug = utils.overlap(speculative, sug)
-                notify_line_change(buf, row, pre_line)
+                local pre_line, _, suf_sug = utils.overlap(local_context.middle, sug)
                 cache.cache_add({
                     prefix = local_context.prefix,
                     middle = pre_line,
@@ -218,10 +220,6 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
                 sug = suf_sug
             end
             cache.cache_add(local_context, sug)
-
-            if config.stop_on_stop_char and not speculative then
-                request_infill_speculative(buf, req_id, local_context, suggestion.get(), row, col + #sug)
-            end
         end)
     end)
 
@@ -238,7 +236,7 @@ function M.request_infill(req_id, local_context, lsp_context, speculative)
         if not chunk then return end
         on_stream_read(chunk, req_id, row, col)
     end)
-end
+end, 50)
 
 ---@param route string
 ---@param payload string
