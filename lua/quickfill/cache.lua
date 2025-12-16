@@ -2,6 +2,7 @@ local M = {}
 
 local config = require "quickfill.config"
 local logger = require "quickfill.logger"
+local persist = require "quickfill.persist"
 
 ---@type table<string, string>
 local cache = {}
@@ -53,6 +54,17 @@ function M.cache_get(context)
     logger.info("cache lru promote", { hash = hash })
 
     return value
+end
+
+---@return table<string, string>
+function M.get_cache()
+    return cache
+end
+
+---@param loaded_cache table<string, string>?
+function M.load_cache(loaded_cache)
+    cache = loaded_cache or {}
+    lru = vim.tbl_keys(cache)
 end
 
 return M

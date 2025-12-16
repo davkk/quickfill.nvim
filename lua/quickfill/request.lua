@@ -160,7 +160,7 @@ end
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param speculative? string
-M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, speculative)
+local function request_infill(req_id, local_context, lsp_context, speculative)
     if req_id ~= request_id then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
@@ -236,7 +236,9 @@ M.request_infill = utils.debounce(function(req_id, local_context, lsp_context, s
         if not chunk then return end
         on_stream_read(chunk, req_id, row, col)
     end)
-end, 50)
+end
+
+M.request_infill = utils.debounce(request_infill, 50)
 
 ---@param route string
 ---@param payload string

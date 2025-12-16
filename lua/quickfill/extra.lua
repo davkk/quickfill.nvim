@@ -128,4 +128,14 @@ function M.try_add_chunk(buf, row)
     end)()
 end
 
+---@return table<quickfill.ExtraChunk>
+function M.get_chunks()
+    return chunks
+end
+
+---@param loaded_chunks table<quickfill.ExtraChunk>?
+function M.load_extra(loaded_chunks)
+    chunks = loaded_chunks or {}
+end
+
 return M

@@ -19,8 +19,28 @@ local extra = require "quickfill.extra"
 local request = require "quickfill.request"
 local suggestion = require "quickfill.suggestion"
 local config = require "quickfill.config"
+local persist = require "quickfill.persist"
 
 local group = vim.api.nvim_create_augroup("ai", { clear = true })
+
+vim.api.nvim_create_autocmd("VimEnter", {
+    group = group,
+    callback = function()
+        local loaded_cache, loaded_extra = persist.load_persisted_data()
+        cache.load_cache(loaded_cache)
+        extra.load_extra(loaded_extra)
+    end,
+})
+
+vim.api.nvim_create_autocmd("VimLeave", {
+    group = group,
+    callback = function()
+        persist.save_persisted_data {
+            cache = cache.get_cache(),
+            extra_chunks = extra.get_chunks(),
+        }
+    end,
+})
 
 vim.api.nvim_create_user_command("AI", function()
     vim.keymap.set("i", "<C-q>", function()
