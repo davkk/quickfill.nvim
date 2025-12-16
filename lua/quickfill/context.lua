@@ -74,7 +74,7 @@ local function lsp_request(buf, method, params)
 
         active_cancels[buf] = active_cancels[buf] or {}
         active_cancels[buf][method] = cancel_lsp_req
-        timer:start(200, 0, function()
+        timer:start(300, 0, function()
             if not done then
                 done = true
                 if active_cancels[buf] then active_cancels[buf][method] = nil end
