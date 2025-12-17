@@ -15,13 +15,6 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 - **Extra Context Chunks**: Automatically extracts and includes relevant code snippets from your project.
 - **Git-Aware**: Respects `.gitignore` for context extraction.
 
-### How It Works
-
-- **Context Gathering**: Collects prefix/suffix from the current buffer and enriches with LSP data (completions, signatures).
-- **Infill Request**: Uses llama.cpp's `/infill` endpoint with context, model config, and extra chunks.
-- **Streaming Response**: Receives and displays suggestions in real-time.
-- **Caching**: Stores results for identical contexts to speed up repeats.
-
 ## 🚀 Installation
 
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -43,18 +36,39 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 }
 ```
 
-## 📋 Requirements
+## ⚙️ Configuration
 
-- **curl** installed in path
-- **llama.cpp server**: A running instance of the llama.cpp server for infill. Download and run with a compatible model (e.g., Qwen).
-  - Example: `./llama-server --model codellama-7b-instruct.gguf --ctx-size 4096 --host 127.0.0.1 --port 8080`
-- **LSP Server**: Recommended for enhanced context (e.g., tsserver for TypeScript, pyright for Python).
+Customize behavior via `vim.g.quickfill`.
 
-## 🛠️ Setup
+Defaults are used if not set explicitly:
 
-1. **Start the llama.cpp server** on `http://127.0.0.1:8080` (or configure a custom URL).
-2. **Start the plugin** in Neovim: `:AI start`
-3. **Edit code**: Suggestions appear as you type in insert mode.
+```lua
+vim.g.quickfill = {
+    url = "http://localhost:8012",          -- Llama.cpp server URL
+
+    n_predict = 8,                          -- Max tokens to predict
+    top_k = 30,                             -- Top-k sampling
+    top_p = 0.4,                            -- Top-p sampling
+    repeat_penalty = 1.5,                   -- Repeat penalty
+
+    stop_chars = { "\n", "\r", "\r\n" },    -- Stop characters
+    stop_on_stop_char = true,               -- Stop on stop chars
+
+    n_prefix = 16,                          -- Prefix context lines
+    n_suffix = 8,                           -- Suffix context lines
+
+    max_cache_entries = 32,                 -- Max cache entries
+
+    extra_chunks = false,                   -- Enable extra project chunks
+    max_extra_chunks = 4,                   -- Max extra chunks
+    chunk_lines = 16,                       -- Lines per chunk
+
+    lsp_completion = true,                  -- Enable LSP completions
+    max_lsp_completion_items = 15,          -- Max LSP items
+
+    lsp_signature_help = false,             -- Enable signature help
+}
+```
 
 ## 📖 Commands
 
