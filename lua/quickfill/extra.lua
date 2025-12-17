@@ -110,7 +110,7 @@ function M.try_add_chunk(buf, row)
     local input_extra = M.get_input_extra()
 
     async.async(function()
-        async.await(require("quickfill.request").request_json(
+        async.await(utils.request_json(
             "infill",
             vim.json.encode {
                 input_prefix = "",

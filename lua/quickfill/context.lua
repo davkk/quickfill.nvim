@@ -2,7 +2,7 @@ local M = {}
 
 local config = require "quickfill.config"
 local async = require "quickfill.async"
-local request = require "quickfill.request"
+local utils = require "quickfill.utils"
 local logger = require "quickfill.logger"
 
 ---@type table<number, table<string, function>>
@@ -170,7 +170,7 @@ function M.get_lsp_context(buf, line, params)
 
     local logit_bias = {}
     if #tokenize > 0 then
-        local err, tokenize_resp = async.await(request.request_json(
+        local err, tokenize_resp = async.await(utils.request_json(
             "tokenize",
             vim.json.encode {
                 content = tokenize,

@@ -7,6 +7,7 @@ local cache = require "quickfill.cache"
 local suggestion = require "quickfill.suggestion"
 local extra = require "quickfill.extra"
 local logger = require "quickfill.logger"
+local context = require "quickfill.context"
 
 ---@type uv.uv_process_t?
 local handle = nil
@@ -101,7 +102,7 @@ local function request_infill_speculative(buf, req_id, local_context, sug, row, 
     lines[row] = new_line
     notify_line_change(buf, lines)
     async.async(function()
-        local new_lsp_context = require("quickfill.context").get_lsp_context(buf, new_line, {
+        local new_lsp_context = context.get_lsp_context(buf, new_line, {
             textDocument = { uri = vim.uri_from_bufnr(buf), version = vim.lsp.util.buf_versions[buf] },
             position = { line = row - 1, character = col },
         })
@@ -240,32 +241,6 @@ end
 
 M.request_infill = utils.debounce(request_infill, 50)
 
----@param route string
----@param payload string
-function M.request_json(route, payload)
-    return function(resume)
-        logger.info("request llama", { route = route })
-        vim.system({
-            "curl",
-            ("%s/%s"):format(config.url, route),
-            "-X",
-            "POST",
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            "@-",
-        }, { stdin = payload }, function(result)
-            if result.code == 0 then
-                logger.info("request llama", { route = route, code = result.code })
-                resume(nil, vim.json.decode(result.stdout))
-            else
-                logger.error("request llama", { route = route, error = result.stderr, code = result.code })
-                resume(result.stderr)
-            end
-        end)
-    end
-end
-
 function M.cancel_stream()
     -- FIXME: I don't think this should be wrapped in pcall
     pcall(function()
@@ -283,6 +258,59 @@ function M.cancel_stream()
             stdout = nil
         end
     end)
+end
+
+---@param buf number
+function M.suggest(buf)
+    M.cancel_stream()
+    suggestion.clear()
+
+    local req_id = M.next_request_id()
+
+    ---@type number, number
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local best = ""
+    local local_context = context.get_local_context()
+    local cached = cache.cache_get(local_context)
+
+    for i = 1, 64 do
+        if cached then
+            best = cached
+            break
+        end
+
+        local new_middle = local_context.middle:sub(1, #local_context.middle - i)
+        if #new_middle == 0 then break end
+
+        local new_context = {
+            prefix = local_context.prefix,
+            middle = new_middle,
+            suffix = local_context.suffix,
+        }
+        local hit = cache.cache_get(new_context)
+        if hit then
+            local removed = local_context.middle:sub(#local_context.middle - i + 1)
+            if hit:sub(1, #removed) == removed then
+                local remain = hit:sub(#removed + 1)
+                if #remain > #best then best = remain end
+            end
+        end
+    end
+
+    if #best > 0 then
+        if req_id ~= M.latest_id() then return end
+        suggestion.show(best, row, col)
+        return
+    end
+
+    async.async(function()
+        if req_id ~= M.latest_id() then return end
+        local lsp_context = context.get_lsp_context(buf, local_context.middle)
+        vim.schedule(function()
+            if req_id ~= M.latest_id() then return end
+            M.request_infill(req_id, local_context, lsp_context)
+        end)
+    end)()
 end
 
 return M

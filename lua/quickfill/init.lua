@@ -12,37 +12,36 @@
 ---@field filename string
 ---@field lines table<string, boolean>
 
-local async = require "quickfill.async"
-local cache = require "quickfill.cache"
-local context = require "quickfill.context"
-local extra = require "quickfill.extra"
-local request = require "quickfill.request"
-local suggestion = require "quickfill.suggestion"
-local config = require "quickfill.config"
-local persist = require "quickfill.persist"
+local M = {}
 
-local group = vim.api.nvim_create_augroup("ai", { clear = true })
+M.group = nil
+M.enabled = false
 
-vim.api.nvim_create_autocmd("VimEnter", {
-    group = group,
-    callback = function()
-        local loaded_cache, loaded_extra = persist.load_persisted_data()
-        cache.load_cache(loaded_cache)
-        extra.load_extra(loaded_extra)
-    end,
-})
+function M.start_plugin()
+    if M.enabled then return end
+    M.enabled = true
 
-vim.api.nvim_create_autocmd("VimLeave", {
-    group = group,
-    callback = function()
-        persist.save_persisted_data {
-            cache = cache.get_cache(),
-            extra_chunks = extra.get_chunks(),
-        }
-    end,
-})
+    local async = require "quickfill.async"
+    local cache = require "quickfill.cache"
+    local context = require "quickfill.context"
+    local extra = require "quickfill.extra"
+    local request = require "quickfill.request"
+    local suggestion = require "quickfill.suggestion"
+    local config = require "quickfill.config"
+    local persist = require "quickfill.persist"
 
-vim.api.nvim_create_user_command("AI", function()
+    M.group = vim.api.nvim_create_augroup("ai", { clear = true })
+
+    vim.api.nvim_create_autocmd("VimLeave", {
+        group = M.group,
+        callback = function()
+            persist.save_persisted_data {
+                cache = cache.get_cache(),
+                extra_chunks = extra.get_chunks(),
+            }
+        end,
+    })
+
     vim.keymap.set("i", "<C-q>", function()
         if #suggestion.get() > 0 then
             if vim.fn.pumvisible() == 1 then
@@ -73,7 +72,7 @@ vim.api.nvim_create_user_command("AI", function()
     end)
 
     vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter" }, {
-        group = group,
+        group = M.group,
         callback = function(ev)
             request.cancel_stream()
             suggestion.clear()
@@ -128,7 +127,7 @@ vim.api.nvim_create_user_command("AI", function()
     })
 
     vim.api.nvim_create_autocmd({ "InsertLeavePre", "CursorMoved", "CursorMovedI" }, {
-        group = group,
+        group = M.group,
         callback = function()
             suggestion.clear()
             request.cancel_stream()
@@ -136,11 +135,33 @@ vim.api.nvim_create_user_command("AI", function()
     })
 
     vim.api.nvim_create_autocmd({ "CursorHold", "BufWritePost" }, {
-        group = group,
+        group = M.group,
         callback = function(ev)
             if not config.extra_chunks then return end
             local row = unpack(vim.api.nvim_win_get_cursor(0))
             extra.try_add_chunk(ev.buf, row)
         end,
     })
-end, {})
+end
+
+function M.stop_plugin()
+    if not M.enabled then return end
+    M.enabled = false
+
+    local persist = require "quickfill.persist"
+    local cache = require "quickfill.cache"
+    local extra = require "quickfill.extra"
+
+    vim.api.nvim_clear_autocmds { group = M.group }
+
+    persist.save_persisted_data {
+        cache = cache.get_cache(),
+        extra_chunks = extra.get_chunks(),
+    }
+
+    pcall(vim.keymap.del, "i", "<C-q>")
+    pcall(vim.keymap.del, "i", "<C-l>")
+    pcall(vim.keymap.del, "i", "<C-space>")
+end
+
+return M
