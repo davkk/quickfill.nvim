@@ -34,14 +34,14 @@ function M.start_plugin()
     M.group = vim.api.nvim_create_augroup("ai", { clear = true })
 
     local loaded_cache, loaded_extra = persist.load_persisted_data()
-    cache.load_cache(loaded_cache)
-    extra.load_extra(loaded_extra)
+    cache.load(loaded_cache)
+    extra.load(loaded_extra)
 
     vim.api.nvim_create_autocmd("VimLeave", {
         group = M.group,
         callback = function()
             persist.save_persisted_data {
-                cache = cache.get_cache(),
+                cache = cache.get_all(),
                 extra_chunks = extra.get_chunks(),
             }
         end,
@@ -105,7 +105,7 @@ function M.stop_plugin()
     vim.api.nvim_clear_autocmds { group = M.group }
 
     persist.save_persisted_data {
-        cache = cache.get_cache(),
+        cache = cache.get_all(),
         extra_chunks = extra.get_chunks(),
     }
 

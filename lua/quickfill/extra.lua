@@ -22,13 +22,13 @@ end
 ---@param lines2 table<string>
 ---@return number
 local function similarity(lines1, lines2)
-    local inter = {}
+    local intersect = {}
     local common = 0
     for _, val in ipairs(lines1) do
-        inter[val] = true
+        intersect[val] = true
     end
     for _, val in ipairs(lines2) do
-        if inter[val] then common = common + 1 end
+        if intersect[val] then common = common + 1 end
     end
     return 2 * common / (#lines1 + #lines2)
 end
@@ -134,7 +134,7 @@ function M.get_chunks()
 end
 
 ---@param loaded_chunks table<quickfill.ExtraChunk>?
-function M.load_extra(loaded_chunks)
+function M.load(loaded_chunks)
     chunks = loaded_chunks or {}
 end
 

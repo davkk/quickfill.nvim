@@ -16,7 +16,7 @@ end
 
 ---@param context quickfill.LocalContext
 ---@param value string
-function M.cache_add(context, value)
+function M.add(context, value)
     if vim.tbl_count(cache) > config.max_cache_entries - 1 then
         local least_used = lru[1]
         logger.info(
@@ -39,7 +39,7 @@ function M.cache_add(context, value)
 end
 
 ---@param context quickfill.LocalContext
-function M.cache_get(context)
+function M.get(context)
     local hash = get_hash(context)
     local value = cache[hash]
     if not value then return nil end
@@ -56,12 +56,12 @@ function M.cache_get(context)
 end
 
 ---@return table<string, string>
-function M.get_cache()
+function M.get_all()
     return cache
 end
 
 ---@param loaded_cache table<string, string>?
-function M.load_cache(loaded_cache)
+function M.load(loaded_cache)
     cache = loaded_cache or {}
     lru = vim.tbl_keys(cache)
 end

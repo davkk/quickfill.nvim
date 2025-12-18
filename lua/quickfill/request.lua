@@ -213,14 +213,14 @@ local function request_infill(req_id, local_context, lsp_context, speculative)
             end
             if speculative and #speculative > 0 then
                 local pre_line, _, suf_sug = utils.overlap(local_context.middle, sug)
-                cache.cache_add({
+                cache.add({
                     prefix = local_context.prefix,
                     middle = pre_line,
                     suffix = local_context.suffix,
                 }, sug)
                 sug = suf_sug
             end
-            cache.cache_add(local_context, sug)
+            cache.add(local_context, sug)
         end)
     end)
 
@@ -271,7 +271,7 @@ function M.suggest(buf)
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local best = ""
     local local_context = context.get_local_context()
-    local cached = cache.cache_get(local_context)
+    local cached = cache.get(local_context)
 
     for i = 1, 64 do
         if cached then
@@ -287,7 +287,7 @@ function M.suggest(buf)
             middle = new_middle,
             suffix = local_context.suffix,
         }
-        local hit = cache.cache_get(new_context)
+        local hit = cache.get(new_context)
         if hit then
             local removed = local_context.middle:sub(#local_context.middle - i + 1)
             if hit:sub(1, #removed) == removed then
