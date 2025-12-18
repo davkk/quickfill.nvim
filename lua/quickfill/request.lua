@@ -38,7 +38,7 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
     if lsp_context.completions then input_extra[#input_extra + 1] = { text = lsp_context.completions } end
     if lsp_context.signatures then input_extra[#input_extra + 1] = { text = lsp_context.signatures } end
 
-    local stop = utils.tbl_copy(config.stop_chars)
+    local stop = utils.tbl_copy(config.stop_chars or {})
     if config.stop_on_stop_char then
         for _, client in ipairs(lsp_clients) do
             for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do

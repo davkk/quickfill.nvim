@@ -152,7 +152,7 @@ function M.get_lsp_context(buf, line, params)
 
         local num_items = 0
         for _, v in ipairs(cmp_items) do
-            if num_items > config.max_lsp_completion_items then break end
+            if num_items >= config.max_lsp_completion_items then break end
             if v.kind ~= vim.lsp.protocol.CompletionItemKind.Snippet and v.label:sub(1, #keyword) == keyword then
                 local label = ("%s %s"):format(vim.lsp.protocol.CompletionItemKind[v.kind]:lower(), v.label)
                 if is_function(v.kind) and not label:match "%(" then label = label .. "(" end

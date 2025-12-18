@@ -69,14 +69,14 @@ function M.start_plugin()
         end)()
     end)
 
-    vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter" }, {
+    vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter", "CursorMovedI" }, {
         group = M.group,
         callback = function(ev)
             request.suggest(ev.buf)
         end,
     })
 
-    vim.api.nvim_create_autocmd({ "InsertLeavePre", "CursorMoved", "CursorMovedI" }, {
+    vim.api.nvim_create_autocmd({ "InsertLeavePre", "CursorMoved" }, {
         group = M.group,
         callback = function()
             suggestion.clear()

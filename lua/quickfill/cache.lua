@@ -2,7 +2,6 @@ local M = {}
 
 local config = require "quickfill.config"
 local logger = require "quickfill.logger"
-local persist = require "quickfill.persist"
 
 ---@type table<string, string>
 local cache = {}
