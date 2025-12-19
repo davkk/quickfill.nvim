@@ -1,7 +1,6 @@
 # quickfill.nvim
 
-[![Neovim](https://img.shields.io/badge/Neovim-0.9+-blue.svg)](https://neovim.io/)
-[![Lua](https://img.shields.io/badge/Lua-5.1+-blue.svg)](https://lua.org/)
+[![Neovim](https://img.shields.io/badge/Neovim-0.11+-blue.svg)](https://neovim.io/)
 
 Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integration.
 
@@ -29,9 +28,9 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 
         -- the plugin uses `<Plug>` mappings for flexibility
         -- you can map them to your preferred keys like this:
-        vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")         -- Accept full suggestion
-        vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")    -- Accept next word
-        vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")        -- Manual infill trigger
+        vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")         -- accept full suggestion
+        vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")    -- accept next word
+        vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")        -- trigger fresh infill request
     end,
 }
 ```
@@ -44,31 +43,31 @@ Defaults are used if not set explicitly:
 
 ```lua
 vim.g.quickfill = {
-    url = "http://localhost:8012",          -- Llama.cpp server URL
+    url = "http://localhost:8012",          -- llama.cpp server URL
 
-    n_predict = 8,                          -- Max tokens to predict
-    top_k = 30,                             -- Top-k sampling
-    top_p = 0.4,                            -- Top-p sampling
-    repeat_penalty = 1.5,                   -- Repeat penalty
+    n_predict = 8,                          -- max tokens to predict
+    top_k = 30,                             -- top-k sampling
+    top_p = 0.4,                            -- top-p sampling
+    repeat_penalty = 1.5,                   -- repeat penalty
 
-    stop_chars = { "\n", "\r", "\r\n" },    -- Stop characters
-    stop_on_trigger_char = true,            -- Stop on stop chars
+    stop_chars = { "\n", "\r", "\r\n" },    -- stop characters
+    stop_on_trigger_char = true,            -- stop on trigger chars defined by LSP server
 
-    speculative_infill = true,              -- Enable speculative infill
+    speculative_infill = true,              -- enable speculative infill
 
-    n_prefix = 16,                          -- Prefix context lines
-    n_suffix = 8,                           -- Suffix context lines
+    n_prefix = 16,                          -- prefix context lines
+    n_suffix = 8,                           -- suffix context lines
 
-    max_cache_entries = 32,                 -- Max cache entries
+    max_cache_entries = 32,                 -- max cache entries
 
-    extra_chunks = false,                   -- Enable extra project chunks
-    max_extra_chunks = 4,                   -- Max extra chunks
-    chunk_lines = 16,                       -- Lines per chunk
+    extra_chunks = false,                   -- enable extra project chunks
+    max_extra_chunks = 4,                   -- max extra chunks
+    chunk_lines = 16,                       -- lines per chunk
 
-    lsp_completion = true,                  -- Enable LSP completions
-    max_lsp_completion_items = 15,          -- Max LSP items
+    lsp_completion = true,                  -- enable LSP completions
+    max_lsp_completion_items = 15,          -- max LSP completion items
 
-    lsp_signature_help = false,             -- Enable signature help
+    lsp_signature_help = false,             -- enable signature help
 }
 ```
 
