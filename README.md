@@ -52,7 +52,9 @@ vim.g.quickfill = {
     repeat_penalty = 1.5,                   -- Repeat penalty
 
     stop_chars = { "\n", "\r", "\r\n" },    -- Stop characters
-    stop_on_stop_char = true,               -- Stop on stop chars
+    stop_on_trigger_char = true,            -- Stop on stop chars
+
+    speculative_infill = true,              -- Enable speculative infill
 
     n_prefix = 16,                          -- Prefix context lines
     n_suffix = 8,                           -- Suffix context lines
