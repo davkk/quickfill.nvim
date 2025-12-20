@@ -1,0 +1,197 @@
+*quickfill.txt*         Fast AI-powered code completion for Neovim
+
+==============================================================================
+CONTENTS                                                  *quickfill-contents*
+
+    1. Introduction .................................. |quickfill-intro|
+    2. Installation .................................. |quickfill-install|
+    3. Configuration ................................. |quickfill-config|
+    4. Usage ......................................... |quickfill-usage|
+    5. Commands ...................................... |quickfill-commands|
+    6. Keymaps ....................................... |quickfill-keymaps|
+    7. API ........................................... |quickfill-api|
+    8. Troubleshooting ............................... |quickfill-troubleshoot|
+    9. Health Checks ................................. |quickfill-health|
+
+==============================================================================
+INTRODUCTION                                              *quickfill-intro*
+
+quickfill.nvim provides intelligent code infill suggestions by combining
+your LSP server's context with a local llama.cpp server. It offers
+blazing-fast completions with near-zero latency using local AI inference.
+
+Features:
+- LSP-backed context gathering
+- Local AI inference (no data leaves your machine)
+- Smart caching for repeated contexts
+- Project-wide context chunks
+- Speculative infill
+- Persistent storage across sessions
+
+==============================================================================
+INSTALLATION                                             *quickfill-install*
+
+Requirements:
+- Neovim 0.11+
+- llama.cpp server running locally
+- curl for API communication
+- LSP server(s) configured
+
+Using lazy.nvim: >
+
+    {
+        "davkk/quickfill.nvim",
+        lazy = true,
+        cmd = "AI",
+        config = function()
+            vim.g.quickfill = {
+                url = "http://localhost:8012",
+            }
+            vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")
+            vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")
+            vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")
+        end,
+    }
+<
+
+==============================================================================
+CONFIGURATION                                           *quickfill-config*
+
+Configure via vim.g.quickfill (table or function). Defaults work out-of-the-box.
+
+                                                            *quickfill-config-options*
+Available options:
+
+url                          string  Llama server URL
+                             Default: "http://localhost:8012"
+
+n_predict                    number  Max tokens to predict
+                             Default: 8
+
+top_k                        number  Top-k sampling
+                             Default: 30
+
+top_p                        number  Top-p sampling
+                             Default: 0.4
+
+repeat_penalty               number  Repeat penalty
+                             Default: 1.5
+
+stop_chars                   table   Stop characters
+                             Default: {"\n", "\r", "\r\n"}
+
+stop_on_trigger_char         boolean Stop on LSP trigger chars
+                             Default: true
+
+speculative_infill           boolean Enable speculative infill
+                             Default: true
+
+n_prefix                     number  Prefix context lines
+                             Default: 32
+
+n_suffix                     number  Suffix context lines
+                             Default: 16
+
+max_cache_entries            number  Max cache entries
+                             Default: 32
+
+extra_chunks                 boolean Enable project chunks
+                             Default: false
+
+max_extra_chunks             number  Max extra chunks
+                             Default: 8
+
+chunk_lines                  number  Lines per chunk
+                             Default: 16
+
+lsp_completion               boolean Enable LSP completions
+                             Default: true
+
+max_lsp_completion_items     number  Max LSP completion items
+                             Default: 20
+
+lsp_signature_help           boolean Enable signature help
+                             Default: true
+
+Example: >
+    vim.g.quickfill = {
+        url = "http://localhost:8080",
+        n_predict = 16,
+        extra_chunks = true,
+    }
+<
+
+==============================================================================
+USAGE                                                     *quickfill-usage*
+
+1. Start the plugin: `:AI start`
+2. Type code and suggestions will appear automatically
+3. Accept suggestions with your configured keymaps
+
+The plugin automatically:
+- Monitors text changes and cursor movement
+- Gathers context from current buffer and LSP
+- Requests completions from the AI server
+- Displays suggestions as virtual text
+- Caches results for future use
+
+==============================================================================
+COMMANDS                                                 *quickfill-commands*
+
+:AI [subcommand]                                          *:AI*
+
+    Start/stop the plugin and show status.
+
+    Subcommands:
+        start           Start suggestions (default if no args)
+        stop            Stop and clean up
+        status          Show plugin status
+
+==============================================================================
+KEYMAPS                                                  *quickfill-keymaps*
+
+The plugin provides <Plug> mappings that you can bind to preferred keys:
+
+<Plug>(quickfill-accept)                                  *<Plug>(quickfill-accept)*
+    Accept the full current suggestion.
+
+<Plug>(quickfill-accept-word)                           *<Plug>(quickfill-accept-word)*
+    Accept the next word of the current suggestion.
+
+<Plug>(quickfill-trigger)                               *<Plug>(quickfill-trigger)*
+    Manually trigger a fresh infill request.
+
+Example keymaps: >
+    vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")
+    vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")
+    vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")
+<
+==============================================================================
+TROUBLESHOOTING                                     *quickfill-troubleshoot*
+
+No suggestions appear: ~
+- Check server: `curl http://localhost:8012/health`
+- Verify LSP: `:LspInfo`
+- Check config: `:lua print(vim.inspect(vim.g.quickfill))`
+
+Server errors: ~
+- Check logs: `~/.local/state/nvim/quickfill.log`
+
+Performance issues: ~
+- Reduce context: `n_prefix = 16, n_suffix = 8`
+- Disable chunks: `extra_chunks = false`
+- Increase cache: `max_cache_entries = 64`
+
+==============================================================================
+HEALTH CHECKS                                           *quickfill-health*
+
+Run `:checkhealth quickfill` to validate:
+
+- Configuration validity
+- Server connectivity
+- External dependencies (curl, llama.cpp)
+- Plugin initialization status
+- Cache and persistence health
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
