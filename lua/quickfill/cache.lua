@@ -66,4 +66,9 @@ function M.load(loaded_cache)
     lru = vim.tbl_keys(cache)
 end
 
+function M.clear()
+    cache = {}
+    lru = {}
+end
+
 return M

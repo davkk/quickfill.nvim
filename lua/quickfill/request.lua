@@ -41,8 +41,10 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
     local stop = utils.tbl_copy(config.stop_chars or {})
     if config.stop_on_trigger_char then
         for _, client in ipairs(lsp_clients) do
-            for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do
-                if char ~= " " and not vim.tbl_contains(stop, char) then stop[#stop + 1] = char end
+            if client.server_capabilities.completionProvider then
+                for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do
+                    if char ~= " " and not vim.tbl_contains(stop, char) then stop[#stop + 1] = char end
+                end
             end
         end
     end
@@ -102,10 +104,10 @@ local function request_infill_speculative(buf, req_id, buf_version, local_contex
     lines[row] = new_line
     notify_line_change(buf, buf_version, lines)
     async.async(function()
-        local new_lsp_context = context.get_lsp_context(buf, new_line, {
+        local new_lsp_context = context.get_lsp_context(buf, {
             textDocument = { uri = vim.uri_from_bufnr(buf), version = vim.lsp.util.buf_versions[buf] },
             position = { line = row - 1, character = col },
-        })
+        }, new_line)
         vim.schedule(function()
             M.request_infill(req_id, buf_version, new_local_context, new_lsp_context, sug)
         end)
@@ -272,7 +274,7 @@ function M.suggest(buf)
     ---@type number, number
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local best = ""
-    local local_context = context.get_local_context()
+    local local_context = context.get_local_context(buf)
     local cached = cache.get(local_context)
 
     for i = 1, 64 do
@@ -309,7 +311,7 @@ function M.suggest(buf)
 
     async.async(function()
         if req_id ~= M.latest_id() then return end
-        local lsp_context = context.get_lsp_context(buf, local_context.middle)
+        local lsp_context = context.get_lsp_context(buf, nil, local_context.middle)
         vim.schedule(function()
             if req_id ~= M.latest_id() then return end
             M.request_infill(req_id, buf_version, local_context, lsp_context)
