@@ -95,7 +95,8 @@ end
 ---@param sug string
 ---@param row number
 ---@param col number
-local function request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col)
+---@param depth number
+local function request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col, depth)
     local new_line = local_context.middle .. sug
     local new_local_context = {
         prefix = local_context.prefix,
@@ -111,7 +112,7 @@ local function request_infill_speculative(buf, req_id, buf_version, local_contex
             position = { line = row - 1, character = col },
         }, new_line)
         vim.schedule(function()
-            M.request_infill(req_id, buf_version, new_local_context, new_lsp_context, sug)
+            M.request_infill(req_id, buf_version, new_local_context, new_lsp_context, sug, depth)
         end)
     end)()
 end
@@ -165,7 +166,9 @@ end
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param speculative? string
-local function request_infill(req_id, buf_version, local_context, lsp_context, speculative)
+---@param depth? number
+local function request_infill(req_id, buf_version, local_context, lsp_context, speculative, depth)
+    if not depth then depth = 0 end
     if req_id ~= request_id then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
@@ -215,7 +218,7 @@ local function request_infill(req_id, buf_version, local_context, lsp_context, s
 
         vim.schedule(function()
             if config.stop_on_trigger_char and config.speculative_infill and not speculative then
-                request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col + #sug)
+                request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col + #sug, 0)
             end
             if speculative and #speculative > 0 then
                 local pre_line, _, suf_sug = utils.overlap(local_context.middle, sug)
@@ -225,6 +228,16 @@ local function request_infill(req_id, buf_version, local_context, lsp_context, s
                     suffix = local_context.suffix,
                 }, sug)
                 sug = suf_sug
+            end
+            if
+                config.stop_on_trigger_char
+                and config.speculative_infill
+                and speculative
+                and #sug > 0
+                and depth < 10
+            then
+                local next_col = col + #speculative
+                request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, next_col, depth + 1)
             end
             cache.add(local_context, sug)
         end)
@@ -316,7 +329,7 @@ function M.suggest(buf)
         local lsp_context = context.get_lsp_context(buf, nil, local_context.middle)
         vim.schedule(function()
             if req_id ~= M.latest_id() then return end
-            M.request_infill(req_id, buf_version, local_context, lsp_context)
+            M.request_infill(req_id, buf_version, local_context, lsp_context, nil, 0)
         end)
     end)()
 end
