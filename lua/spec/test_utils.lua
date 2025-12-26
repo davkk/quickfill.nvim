@@ -21,7 +21,7 @@ function M.calculate_fib(n)
     for i = 2, n do
         next_val = a + b
         a = b
-        b = next_val
+        b 
     end
 
     return b
@@ -30,9 +30,9 @@ end
 return M]],
         "\n"
     )
-    local buffer = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_win_set_buf(0, buffer)
+    local buffer = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buffer, 0, -1, false, content)
+    vim.api.nvim_win_set_buf(0, buffer)
     return buffer
 end
 

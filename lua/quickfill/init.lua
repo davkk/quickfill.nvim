@@ -17,7 +17,7 @@ local M = {}
 M.group = nil
 M.enabled = false
 
-function M.start_plugin()
+function M.start()
     if M.enabled then return end
     M.enabled = true
 
@@ -95,7 +95,7 @@ function M.start_plugin()
     })
 end
 
-function M.stop_plugin()
+function M.stop()
     if not M.enabled then return end
     M.enabled = false
 

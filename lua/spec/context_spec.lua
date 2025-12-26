@@ -74,7 +74,7 @@ describe("context", function()
         local expected = {
             middle = "    local ",
             prefix = "    end\n\n    local a = 0\n    local b = 1\n",
-            suffix = "next_val\n\n    for i = 2, n do\n        next_val = a + b\n        a = b\n        b = next_val\n",
+            suffix = "next_val\n\n    for i = 2, n do\n        next_val = a + b\n        a = b\n        b \n",
         }
         assert.are.same(expected, result)
     end)

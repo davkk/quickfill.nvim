@@ -128,13 +128,6 @@ USAGE                                                     *quickfill-usage*
 2. Type code and suggestions will appear automatically
 3. Accept suggestions with your configured keymaps
 
-The plugin automatically:
-- Monitors text changes and cursor movement
-- Gathers context from current buffer and LSP
-- Requests completions from the AI server
-- Displays suggestions as virtual text
-- Caches results for future use
-
 ==============================================================================
 COMMANDS                                                 *quickfill-commands*
 
@@ -169,12 +162,7 @@ Example keymaps: >
 ==============================================================================
 TROUBLESHOOTING                                     *quickfill-troubleshoot*
 
-No suggestions appear: ~
-- Check server: `curl http://localhost:8012/health`
-- Verify LSP: `:LspInfo`
-- Check config: `:lua print(vim.inspect(vim.g.quickfill))`
-
-Server errors: ~
+Server log: ~
 - Check logs: `~/.local/state/nvim/quickfill.log`
 
 Performance issues: ~
@@ -188,8 +176,8 @@ HEALTH CHECKS                                           *quickfill-health*
 Run `:checkhealth quickfill` to validate:
 
 - Configuration validity
-- Server connectivity
 - External dependencies (curl, llama.cpp)
+- Server connectivity
 - Plugin initialization status
 - Cache and persistence health
 

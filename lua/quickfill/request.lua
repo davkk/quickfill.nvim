@@ -75,9 +75,11 @@ local function notify_line_change(buf, version, lines)
 
     local clients = vim.lsp.get_clients { bufnr = buf }
     for _, client in ipairs(clients) do
+        -- FIXME: this sometimes breaks LSP servers
         client:notify("textDocument/didChange", {
             textDocument = {
                 uri = vim.uri_from_bufnr(buf),
+                version = version,
             },
             contentChanges = {
                 -- FIXME: I should be sending incremental changes and not whole buffers
@@ -243,7 +245,7 @@ local function request_infill(req_id, buf_version, local_context, lsp_context, s
     end)
 end
 
-M.request_infill = utils.debounce(request_infill, 50)
+M.request_infill = request_infill
 
 function M.cancel_stream()
     -- FIXME: I don't think this should be wrapped in pcall
