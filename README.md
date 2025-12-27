@@ -1,10 +1,16 @@
+<div align="center">
+
+<img width="256" height="auto" alt="quickfill-logo" src="https://github.com/user-attachments/assets/e08f122b-83fc-4029-b983-c86bc5f46b2f" />
+
 # quickfill.nvim
 
 [![Neovim](https://img.shields.io/badge/Neovim-0.11+-blue.svg)](https://neovim.io/)
 
 `quickfill.nvim` provides quick code infill suggestions by combining a local llama.cpp server with active LSP servers.
 
-![quickfill-demo](https://github.com/user-attachments/assets/40d947d0-0449-4cb8-997f-11c92bfc92c7)
+<img width="900" height="auto" alt="quickfill-demo" src="https://github.com/user-attachments/assets/40d947d0-0449-4cb8-997f-11c92bfc92c7" />
+
+</div>
 
 ## Features
 
