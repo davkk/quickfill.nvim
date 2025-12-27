@@ -2,24 +2,22 @@
 
 [![Neovim](https://img.shields.io/badge/Neovim-0.11+-blue.svg)](https://neovim.io/)
 
-Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integration.
-
-`quickfill.nvim` provides intelligent code infill suggestions by combining your LSP server's context with a local llama.cpp server, offering blazing-fast completions with near-zero latency.
+`quickfill.nvim` provides quick code infill suggestions by combining a local llama.cpp server with active LSP servers.
 
 ![quickfill-demo](https://github.com/user-attachments/assets/40d947d0-0449-4cb8-997f-11c92bfc92c7)
 
 ## Features
 
+- **Local AI Inference**: Uses llama.cpp for low latency, on-device inference == no data leaves your machine.
 - **LSP-Backed Context**: Leverages your existing LSP servers for rich context (completions & signatures).
-- **Local AI Inference**: Uses llama.cpp for fast, on-device inference—no data leaves your machine.
-- **Smart Caching**: Caches suggestions for repeated contexts to reduce latency.
-- **Extra Context Chunks**: Automatically extracts and includes relevant code snippets from your project.
+- **Prompt Caching**: Caches suggestions for repeated contexts to reduce latency.
+- **Cross-file Context Chunks**: Automatically extracts and includes relevant code snippets from your project files.
 - **Git-Aware**: Respects `.gitignore` for context extraction.
 
 ## Installation
 
 ```lua
-vim.pack.add("https://github.com/folke/which-key.nvim")
+vim.pack.add "https://github.com/davkk/quickfill.nvim"
 
 -- no need to call setup!
 
