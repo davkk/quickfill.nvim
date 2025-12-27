@@ -229,7 +229,7 @@ function M.suggest(buf)
 
     async.async(function()
         if req_id ~= M.latest_id() then return end
-        local lsp_context = context.get_lsp_context(buf, nil, local_context.middle)
+        local lsp_context = context.get_lsp_context(buf, local_context.middle)
         vim.schedule(function()
             if req_id ~= M.latest_id() then return end
             M.request_infill(req_id, local_context, lsp_context)

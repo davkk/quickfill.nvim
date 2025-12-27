@@ -21,7 +21,7 @@ function M.calculate_fib(n)
     for i = 2, n do
         next_val = a + b
         a = b
-        b 
+        b = next_val
     end
 
     return b

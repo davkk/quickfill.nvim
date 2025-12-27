@@ -196,12 +196,12 @@ local function get_logit_bias(completions)
 end
 
 ---@param buf number
----@param params lsp.TextDocumentPositionParams?
 ---@param line_prefix string
 ---@return quickfill.LspContext
-function M.get_lsp_context(buf, params, line_prefix)
-    params = params or vim.lsp.util.make_position_params(0, "utf-8")
+function M.get_lsp_context(buf, line_prefix)
+    local params = vim.lsp.util.make_position_params(0, "utf-8")
 
+    -- TODO: make lsp requests concurrently
     local lsp_signatures = config.lsp_signature_help and get_lsp_signature_help(buf, params) or {}
     local lsp_completions = config.lsp_completion and get_lsp_completion(buf, params, line_prefix) or {}
     local logit_bias = #lsp_completions > 0 and get_logit_bias(lsp_completions) or {}
