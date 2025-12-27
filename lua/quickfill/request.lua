@@ -31,21 +31,16 @@ end
 
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
----@param lsp_clients vim.lsp.Client[]
 ---@return string
-local function build_infill_payload(local_context, lsp_context, lsp_clients)
+local function build_infill_payload(local_context, lsp_context)
     local input_extra = extra.get_input_extra()
     if lsp_context.completions then input_extra[#input_extra + 1] = { text = lsp_context.completions } end
     if lsp_context.signatures then input_extra[#input_extra + 1] = { text = lsp_context.signatures } end
 
     local stop = utils.tbl_copy(config.stop_chars or {})
     if config.stop_on_trigger_char then
-        for _, client in ipairs(lsp_clients) do
-            if client.server_capabilities.completionProvider then
-                for _, char in ipairs(client.server_capabilities.completionProvider.triggerCharacters or {}) do
-                    if char ~= " " and not vim.tbl_contains(stop, char) then stop[#stop + 1] = char end
-                end
-            end
+        for _, char in ipairs { ".", ":", "[", "{", "(" } do
+            stop[#stop + 1] = char
         end
     end
 
@@ -68,55 +63,6 @@ local function build_infill_payload(local_context, lsp_context, lsp_clients)
     }
 end
 
----@param buf number
----@param lines table<string>
-local function notify_line_change(buf, version, lines)
-    if vim.lsp.util.buf_versions[buf] > version then return end
-
-    local clients = vim.lsp.get_clients { bufnr = buf }
-    for _, client in ipairs(clients) do
-        -- FIXME: this sometimes breaks LSP servers
-        client:notify("textDocument/didChange", {
-            textDocument = {
-                uri = vim.uri_from_bufnr(buf),
-                version = version,
-            },
-            contentChanges = {
-                -- FIXME: I should be sending incremental changes and not whole buffers
-                { text = table.concat(lines, "\n") },
-            },
-        })
-    end
-end
-
----@param buf number
----@param req_id number
----@param local_context quickfill.LocalContext
----@param sug string
----@param row number
----@param col number
----@param depth number
-local function request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col, depth)
-    local new_line = local_context.middle .. sug
-    local new_local_context = {
-        prefix = local_context.prefix,
-        middle = new_line,
-        suffix = local_context.suffix,
-    }
-    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    lines[row] = new_line
-    notify_line_change(buf, buf_version, lines)
-    async.async(function()
-        local new_lsp_context = context.get_lsp_context(buf, {
-            textDocument = { uri = vim.uri_from_bufnr(buf), version = vim.lsp.util.buf_versions[buf] },
-            position = { line = row - 1, character = col },
-        }, new_line)
-        vim.schedule(function()
-            M.request_infill(req_id, buf_version, new_local_context, new_lsp_context, sug, depth)
-        end)
-    end)()
-end
-
 ---@param chunk string
 ---@param req_id number
 ---@param row number
@@ -132,10 +78,12 @@ local function on_stream_read(chunk, req_id, row, col)
     if not ok then return end
 
     local text = resp.content
+
     if config.stop_on_trigger_char and resp.stop then
         if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return end
         text = resp.stopping_word
     end
+
     vim.schedule(function()
         if req_id ~= request_id then return end
         local new_suggestion = suggestion.get() .. text
@@ -165,28 +113,15 @@ end
 ---@param req_id number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
----@param speculative? string
----@param depth? number
-local function request_infill(req_id, buf_version, local_context, lsp_context, speculative, depth)
-    if not depth then depth = 0 end
+local function request_infill(req_id, local_context, lsp_context)
     if req_id ~= request_id then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
-    local buf = vim.api.nvim_get_current_buf()
-
-    if not speculative or #speculative == 0 then
-        M.cancel_stream()
-        suggestion.clear()
-    end
-
-    vim.schedule(function()
-        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-        notify_line_change(buf, buf_version, lines)
-    end)
+    M.cancel_stream()
+    suggestion.clear()
 
     ---@type number, number
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local lsp_clients = vim.lsp.get_clients { bufnr = buf }
 
     stdout = assert(vim.uv.new_pipe(false), "failed to create stdout pipe")
     stdin = assert(vim.uv.new_pipe(false), "failed to create stdin pipe")
@@ -209,45 +144,15 @@ local function request_infill(req_id, buf_version, local_context, lsp_context, s
         local sug = suggestion.get()
         if #sug == 0 then return end
 
-        logger.info(
-            "request llama infill, stream stop",
-            { req_id = req_id, suggestion = sug, speculative = speculative ~= nil }
-        )
-
-        buf_version = vim.lsp.util.buf_versions[buf]
+        logger.info("request llama infill, stream stop", { req_id = req_id, suggestion = sug })
 
         vim.schedule(function()
-            if config.stop_on_trigger_char and config.speculative_infill and not speculative then
-                request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, col + #sug, 0)
-            end
-            if speculative and #speculative > 0 then
-                local pre_line, _, suf_sug = utils.overlap(local_context.middle, sug)
-                cache.add({
-                    prefix = local_context.prefix,
-                    middle = pre_line,
-                    suffix = local_context.suffix,
-                }, sug)
-                sug = suf_sug
-            end
-            if
-                config.stop_on_trigger_char
-                and config.speculative_infill
-                and speculative
-                and #sug > 0
-                and depth < 10
-            then
-                local next_col = col + #speculative
-                request_infill_speculative(buf, req_id, buf_version, local_context, sug, row, next_col, depth + 1)
-            end
             cache.add(local_context, sug)
         end)
     end)
 
-    local payload = build_infill_payload(local_context, lsp_context, lsp_clients)
-    logger.info(
-        "request llama infill, stream start",
-        { req_id = req_id, prompt = local_context.middle, speculative = speculative ~= nil }
-    )
+    local payload = build_infill_payload(local_context, lsp_context)
+    logger.info("request llama infill, stream start", { req_id = req_id, prompt = local_context.middle })
     stdin:write(payload, function()
         stdin:close()
     end)
@@ -322,14 +227,12 @@ function M.suggest(buf)
         return
     end
 
-    local buf_version = vim.lsp.util.buf_versions[buf]
-
     async.async(function()
         if req_id ~= M.latest_id() then return end
         local lsp_context = context.get_lsp_context(buf, nil, local_context.middle)
         vim.schedule(function()
             if req_id ~= M.latest_id() then return end
-            M.request_infill(req_id, buf_version, local_context, lsp_context, nil, 0)
+            M.request_infill(req_id, local_context, lsp_context)
         end)
     end)()
 end

@@ -6,7 +6,6 @@
 ---@field repeat_penalty? number Repeat penalty
 ---@field stop_chars? string[] Stop characters
 ---@field stop_on_trigger_char? boolean Stop on stop chars
----@field speculative_infill? boolean Enable speculative infill
 ---@field n_prefix? integer Prefix lines
 ---@field n_suffix? integer Suffix lines
 ---@field max_cache_entries? integer Max cache entries
@@ -31,8 +30,6 @@ local default_config = {
 
     stop_chars = { "\n", "\r", "\r\n" },
     stop_on_trigger_char = true,
-
-    speculative_infill = true,
 
     n_prefix = 32,
     n_suffix = 16,
@@ -62,7 +59,6 @@ local ok, err = pcall(vim.validate, {
     repeat_penalty = { config.repeat_penalty, "number" },
     stop_chars = { config.stop_chars, "table" },
     stop_on_trigger_char = { config.stop_on_trigger_char, "boolean" },
-    speculative_infill = { config.speculative_infill, "boolean" },
     n_prefix = { config.n_prefix, "number" },
     n_suffix = { config.n_suffix, "number" },
     max_cache_entries = { config.max_cache_entries, "number" },

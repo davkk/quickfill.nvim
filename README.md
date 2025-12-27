@@ -6,7 +6,7 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 
 `quickfill.nvim` provides intelligent code infill suggestions by combining your LSP server's context with a local llama.cpp server, offering blazing-fast completions with near-zero latency.
 
-## ✨ Features
+## Features
 
 - **LSP-Backed Context**: Leverages your existing LSP servers for rich context (completions & signatures).
 - **Local AI Inference**: Uses llama.cpp for fast, on-device inference—no data leaves your machine.
@@ -14,28 +14,21 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 - **Extra Context Chunks**: Automatically extracts and includes relevant code snippets from your project.
 - **Git-Aware**: Respects `.gitignore` for context extraction.
 
-## 🚀 Installation
-
-### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
+## Installation
 
 ```lua
-{
-    "davkk/quickfill.nvim",
-    lazy = true,
-    cmd = "AI",
-    config = function()
-        -- no need to call setup!
+vim.pack.add("https://github.com/folke/which-key.nvim")
 
-        -- the plugin uses `<Plug>` mappings for flexibility
-        -- you can map them to your preferred keys like this:
-        vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")         -- accept full suggestion
-        vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")    -- accept next word
-        vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")        -- trigger fresh infill request
-    end,
-}
+-- no need to call setup!
+
+-- the plugin uses `<Plug>` mappings for flexibility
+-- you can map them to your preferred keys like this:
+vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")         -- accept full suggestion
+vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")    -- accept next word
+vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")        -- trigger fresh infill request
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 Customize behavior via `vim.g.quickfill`.
 
@@ -53,8 +46,6 @@ vim.g.quickfill = {
     stop_chars = { "\n", "\r", "\r\n" },    -- stop characters
     stop_on_trigger_char = true,            -- stop on trigger chars defined by LSP server
 
-    speculative_infill = true,              -- enable speculative infill
-
     n_prefix = 16,                          -- prefix context lines
     n_suffix = 8,                           -- suffix context lines
 
@@ -71,7 +62,7 @@ vim.g.quickfill = {
 }
 ```
 
-## 📖 Commands
+## Commands
 
 - `:AI start`: Initialize and start suggestions.
 - `:AI stop`: Stop and clean up.
