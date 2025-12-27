@@ -6,6 +6,8 @@ Fast, local AI-powered code completion for Neovim using llama.cpp with LSP integ
 
 `quickfill.nvim` provides intelligent code infill suggestions by combining your LSP server's context with a local llama.cpp server, offering blazing-fast completions with near-zero latency.
 
+![quickfill-demo](https://github.com/user-attachments/assets/40d947d0-0449-4cb8-997f-11c92bfc92c7)
+
 ## Features
 
 - **LSP-Backed Context**: Leverages your existing LSP servers for rich context (completions & signatures).
