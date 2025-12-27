@@ -211,7 +211,7 @@ function M.get_lsp_context(buf, params, line_prefix)
     end, lsp_completions)
 
     return {
-        logit_bias = #logit_bias > 0 and logit_bias or nil,
+        logit_bias = vim.tbl_count(logit_bias) > 0 and logit_bias or nil,
         completions = #cmp_labels > 0 and table.concat(cmp_labels, "\n") .. "\n" or nil,
         signatures = #lsp_signatures > 0 and table.concat(lsp_signatures, "\n") .. "\n" or nil,
     }
