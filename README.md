@@ -92,6 +92,5 @@ This starts the server on `http://localhost:8012` with optimized settings for th
 
 ## Commands
 
-- `:AI start`: Initialize and start suggestions.
-- `:AI stop`: Stop and clean up.
-- `:AI status`: (Planned) Show plugin status and health.
+- start plugin with `:AI start` or `:AI`
+- stop plugin with `:AI stop`
