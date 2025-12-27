@@ -62,6 +62,28 @@ vim.g.quickfill = {
 }
 ```
 
+## Local Inference Server Setup
+
+Before using the plugin, make sure to have a llama.cpp server running.
+
+Here's an example command to start the server in the background:
+
+```bash
+llama-server \
+    -hf bartowski/Qwen2.5-Coder-0.5B-GGUF:Q4_0 \
+    --n-gpu-layers 99 \
+    --threads 8 \
+    --ctx-size 0 \
+    --flash-attn on \
+    --mlock \
+    --cache-reuse 256 \
+    --verbose \
+    --host localhost \
+    --port 8012
+```
+
+This starts the server on `http://localhost:8012` with optimized settings for the Qwen2.5-Coder-0.5B model. Adjust the host and port as needed.
+
 ## Commands
 
 - `:AI start`: Initialize and start suggestions.
