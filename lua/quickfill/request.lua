@@ -101,6 +101,7 @@ local function on_stream_end(code)
         end)
     end
     if stdout then
+        stdout:read_stop()
         stdout:close()
         stdout = nil
     end
@@ -166,22 +167,37 @@ end
 M.request_infill = request_infill
 
 function M.cancel_stream()
-    -- FIXME: I don't think this should be wrapped in pcall
-    pcall(function()
-        if handle and handle:is_active() then
-            handle:kill()
-            handle:close()
+    if handle and handle:is_active() and not handle:is_closing() then
+        local ok, err = pcall(handle.kill, handle)
+        if not ok then
+            logger.error("Failed to kill handle", { error = err })
+        end
+    end
+    if handle and not handle:is_closing() then
+        local ok, err = pcall(handle.close, handle)
+        if not ok then
+            logger.error("Failed to close handle", { error = err })
+        else
             handle = nil
         end
-        if stdin then
-            stdin:close()
+    end
+    if stdin and not stdin:is_closing() then
+        local ok, err = pcall(stdin.close, stdin)
+        if not ok then
+            logger.error("Failed to close stdin", { error = err })
+        else
             stdin = nil
         end
-        if stdout then
-            stdout:close()
+    end
+    if stdout and not stdout:is_closing() then
+        stdout:read_stop()
+        local ok, err = pcall(stdout.close, stdout)
+        if not ok then
+            logger.error("Failed to close stdout", { error = err })
+        else
             stdout = nil
         end
-    end)
+    end
 end
 
 ---@param buf number
