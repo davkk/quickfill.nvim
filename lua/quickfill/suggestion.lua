@@ -3,7 +3,7 @@ local M = {}
 local utils = require "quickfill.utils"
 local logger = require "quickfill.logger"
 
-local ns = vim.api.nvim_create_namespace "user.ai"
+local ns = vim.api.nvim_create_namespace "quickfill.suggestion"
 
 local suggestion = ""
 
