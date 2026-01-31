@@ -70,4 +70,17 @@ function M.accept_word()
     end
 end
 
+function M.accept_replace()
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]
+
+    vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, { suggestion })
+    vim.api.nvim_win_set_cursor(0, { row, col + #suggestion })
+
+    logger.info("suggestion accept replace", { suggestion = suggestion, row = row, col = col })
+
+    M.clear()
+    suggestion = ""
+end
+
 return M

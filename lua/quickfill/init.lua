@@ -57,6 +57,7 @@ function M.start()
     end
     vim.keymap.set("i", "<Plug>(quickfill-accept)", utils.fn(accept, suggestion.accept))
     vim.keymap.set("i", "<Plug>(quickfill-accept-word)", utils.fn(accept, suggestion.accept_word))
+    vim.keymap.set("i", "<Plug>(quickfill-accept-replace)", utils.fn(accept, suggestion.accept_replace))
 
     vim.keymap.set("i", "<Plug>(quickfill-trigger)", function()
         local buf = vim.api.nvim_get_current_buf()
