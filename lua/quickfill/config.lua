@@ -24,8 +24,8 @@ local default_config = {
     url = "http://localhost:8012",
 
     n_predict = 8,
-    top_k = 30,
-    top_p = 0.4,
+    top_k = 20,
+    top_p = 0.3,
     repeat_penalty = 1.5,
 
     stop_chars = { "\n", "\r", "\r\n" },

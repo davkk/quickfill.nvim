@@ -4,7 +4,7 @@ host=${1:-localhost}
 port=${2:-8012}
 
 llama-server \
-    -hf bartowski/Qwen2.5-Coder-0.5B-GGUF:Q4_0 \
+    -m ~/llms/sweep-next-edit-0.5b.q8_0.gguf \
     --n-gpu-layers 99 \
     --threads 8 \
     --ctx-size 0 \
