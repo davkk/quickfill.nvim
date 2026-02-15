@@ -4,13 +4,12 @@ host=${1:-localhost}
 port=${2:-8012}
 
 llama-server \
-    -m ~/llms/sweep-next-edit-0.5b.q8_0.gguf \
-    --n-gpu-layers 99 \
+    -m ~/llms/bartowski_qwen2.5-coder-0.5b-q4_0.gguf \
+    --n-gpu-layers 12 \
     --threads 8 \
     --ctx-size 0 \
-    --flash-attn on \
     --mlock \
-    --cache-reuse 256 \
+    --cache-reuse 512 \
     --verbose \
     --host $host \
     --port $port
