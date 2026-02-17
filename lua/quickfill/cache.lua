@@ -1,74 +1,66 @@
 local M = {}
 
 local config = require "quickfill.config"
-local logger = require "quickfill.logger"
+local Trie = require "quickfill.trie"
 
----@type table<string, string>
+---@type table<string, quickfill.Trie>
 local cache = {}
 
 ---@type table<string>
 local lru = {}
 
 ---@param context quickfill.LocalContext
-local function get_hash(context)
-    return vim.fn.sha256(context.prefix .. context.middle .. "█" .. context.suffix)
+local function get_key(context)
+    return vim.fn.sha256(context.prefix .. "█" .. context.suffix)
 end
 
 ---@param context quickfill.LocalContext
----@param value string
-function M.add(context, value)
-    if vim.tbl_count(cache) > config.max_cache_entries - 1 then
-        local least_used = lru[1]
-        logger.info(
-            "cache full, removing cache entry",
-            { hash = least_used, value = cache[least_used], prompt = context.middle }
-        )
-        cache[least_used] = nil
-        table.remove(lru, 1)
+function M.remove_entry(context)
+    local key = get_key(context)
+    cache[key] = nil
+    lru = vim.tbl_filter(function(k)
+        return k ~= key
+    end, lru)
+end
+
+---@param context quickfill.LocalContext
+function M.get_or_add(context)
+    local key = get_key(context)
+
+    lru = vim.tbl_filter(function(k)
+        return k ~= key
+    end, lru)
+    lru[#lru + 1] = key
+
+    if not cache[key] then
+        if vim.tbl_count(cache) > config.max_cache_entries - 1 then
+            local least_used = lru[1]
+            cache[least_used] = nil
+            table.remove(lru, 1)
+        end
+        cache[key] = Trie:new()
     end
 
-    local hash = get_hash(context)
-    cache[hash] = value
-    logger.info("cache add", { hash = hash, value = value, prompt = context.middle })
-
-    lru = vim.tbl_filter(function(k)
-        return k ~= hash
-    end, lru)
-    lru[#lru + 1] = hash
-    logger.info("cache lru promote", { hash = hash })
+    return cache[key]
 end
 
----@param context quickfill.LocalContext
-function M.get(context)
-    local hash = get_hash(context)
-    local value = cache[hash]
-    if not value then return nil end
-
-    logger.info("cache get ", { hash = hash, value = value, prompt = context.middle })
-
-    lru = vim.tbl_filter(function(k)
-        return k ~= hash
-    end, lru)
-    lru[#lru + 1] = hash
-    logger.info("cache lru promote", { hash = hash })
-
-    return value
-end
-
----@return table<string, string>
+---@return table<string, quickfill.Trie>
 function M.get_all()
     return cache
 end
 
----@param loaded_cache table<string, string>?
+---@param loaded_cache table<string, quickfill.Trie>?
 function M.load(loaded_cache)
-    cache = loaded_cache or {}
-    lru = vim.tbl_keys(cache)
-end
-
-function M.clear()
     cache = {}
     lru = {}
+    for key, data in pairs(loaded_cache or {}) do
+        local trie = Trie:new()
+        if data then
+            trie:deserialize(data)
+        end
+        cache[key] = trie
+        lru[#lru + 1] = key
+    end
 end
 
 return M

@@ -30,7 +30,6 @@ function M.start()
     local config = require "quickfill.config"
     local persist = require "quickfill.persist"
     local utils = require "quickfill.utils"
-    local Trie = require "quickfill.trie"
 
     M.group = vim.api.nvim_create_augroup("ai", { clear = true })
 
@@ -62,25 +61,20 @@ function M.start()
 
     vim.keymap.set("i", "<Plug>(quickfill-trigger)", function()
         local buf = vim.api.nvim_get_current_buf()
-
-        local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-        local trie = request.tries[row] ---@cast trie quickfill.Trie
         local local_context = context.get_local_context(buf)
 
-        print(vim.inspect(trie:enumerate()))
-        -- local node = trie:insert(local_context.middle)
-        -- suggestion.show(trie:find_longest(node), row, col)
+        request.cancel_stream()
+        suggestion.clear()
+        cache.remove_entry(local_context)
 
-        -- async.async(function()
-        --     local lsp_context = context.get_lsp_context(buf, local_context.middle)
-        --     vim.schedule(function()
-        --         local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
-        --         if not request.tries[row] then request.tries[row] = Trie:new() end
-        --         local trie = request.tries[row] ---@cast trie quickfill.Trie
-        --         local node = trie:insert(local_context.middle)
-        --         request.request_infill(request.next_request_id(), local_context, lsp_context, trie, node)
-        --     end)
-        -- end)()
+        async.async(function()
+            local lsp_context = context.get_lsp_context(buf, local_context.middle)
+            vim.schedule(function()
+                local trie = cache.get_or_add(local_context)
+                local node = trie:insert(local_context.middle)
+                request.request_infill(local_context, lsp_context, trie, node)
+            end)
+        end)()
     end)
 
     vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter" }, {
@@ -102,7 +96,7 @@ function M.start()
         group = M.group,
         callback = function(ev)
             if not config.extra_chunks then return end
-            local row = unpack(vim.api.nvim_win_get_cursor(0))
+            local row, _ = context.get_cursor_pos()
             extra.try_add_chunk(ev.buf, row)
         end,
     })

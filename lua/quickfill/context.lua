@@ -12,10 +12,22 @@ local logger = require "quickfill.logger"
 ---@type table<number, table<string, function>>
 local active_cancels = {}
 
+---@return number, number
+function M.get_cursor_pos()
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    return row, col
+end
+
+---@return string
+function M.get_line_prefix()
+    local _, col = M.get_cursor_pos()
+    return vim.api.nvim_get_current_line():sub(1, col)
+end
+
 ---@param buf number
 ---@return quickfill.LocalContext
 function M.get_local_context(buf)
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local row, col = M.get_cursor_pos()
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
     local prefix = table.concat(lines, "\n", math.max(0, row - 1 - config.n_prefix) + 1, math.max(0, row - 1)) .. "\n"

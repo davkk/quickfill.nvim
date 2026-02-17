@@ -41,37 +41,6 @@ function Trie:insert(text, node)
     return node
 end
 
----@param node quickfill.TrieNode?
----@return string
-function Trie:find_longest(node)
-    node = node or self.root
-    if not next(node.children) then return "" end
-
-    local longest = ""
-    local function traverse(n, prefix)
-        if n.is_end and #prefix > #longest then longest = prefix end
-        for char, child in pairs(n.children) do
-            traverse(child, prefix .. char)
-        end
-    end
-
-    traverse(node, "")
-    return longest
-end
-
----@return string[]
-function Trie:enumerate()
-    local results = {}
-    local function traverse(node, prefix)
-        if node.is_end then table.insert(results, prefix) end
-        for char, child in pairs(node.children) do
-            traverse(child, prefix .. char)
-        end
-    end
-    traverse(self.root, "")
-    return results
-end
-
 ---@param text string
 ---@return quickfill.TrieNode?
 function Trie:find(text)
@@ -84,18 +53,39 @@ function Trie:find(text)
     return node
 end
 
-function Trie:clear()
-    self.root = TrieNode:new()
-end
+---@param node quickfill.TrieNode?
+---@return string
+function Trie:find_longest(node)
+    node = node or self.root
+    if not next(node.children) then return "" end
 
----@return boolean
-function Trie:is_empty()
-    return not next(self.root.children)
+    local longest = ""
+    local function dfs(n, prefix)
+        if n.is_end and #prefix > #longest then longest = prefix end
+        for char, child in pairs(n.children) do
+            dfs(child, prefix .. char)
+        end
+    end
+    dfs(node, "")
+
+    return longest
 end
 
 ---@return quickfill.Trie
 function M.new()
     return Trie:new()
+end
+
+---@param data quickfill.Trie
+function Trie:deserialize(data)
+    local function from_table(t, node)
+        node.is_end = t.is_end
+        for char, child_data in pairs(t.children or {}) do
+            node.children[char] = TrieNode:new()
+            from_table(child_data, node.children[char])
+        end
+    end
+    from_table(data.root, self.root)
 end
 
 return M

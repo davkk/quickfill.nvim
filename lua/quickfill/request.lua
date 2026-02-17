@@ -3,28 +3,17 @@ local M = {}
 local async = require "quickfill.async"
 local utils = require "quickfill.utils"
 local config = require "quickfill.config"
-local cache = require "quickfill.cache"
 local suggestion = require "quickfill.suggestion"
 local extra = require "quickfill.extra"
 local logger = require "quickfill.logger"
 local context = require "quickfill.context"
-local Trie = require "quickfill.trie"
+local cache = require "quickfill.cache"
 
----@class quickfill.ActiveRequest
----@field req_id number
----@field handle uv.uv_process_t
----@field stdout uv.uv_pipe_t
----@field stdin uv.uv_pipe_t
----@field trie quickfill.Trie
----@field node quickfill.TrieNode
----@field current_node quickfill.TrieNode[]
----@field local_context quickfill.LocalContext
+---@type string?
+local pending_request = nil
 
----@type table<number, quickfill.ActiveRequest>
-local active_requests = {}
-
----@type table<number, quickfill.Trie?>
-M.tries = {}
+---@type uv.uv_process_t?
+local handle = nil
 
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
@@ -60,97 +49,77 @@ local function build_infill_payload(local_context, lsp_context)
     }
 end
 
----@param req quickfill.ActiveRequest
 ---@param chunk string
-local function on_stream_read(req, chunk)
-    assert(chunk, "chunk should be defined")
-
-    if not active_requests[req.req_id] then return end
-    if #chunk < 6 or chunk:sub(1, 6) ~= "data: " then return end
+---@param trie quickfill.Trie
+---@param curr_node quickfill.TrieNode
+---@return quickfill.TrieNode
+local function on_stream_read(chunk, trie, curr_node)
+    if #chunk < 6 or chunk:sub(1, 6) ~= "data: " then return curr_node end
 
     chunk = chunk:sub(7)
     local ok, resp = pcall(vim.json.decode, chunk)
-    if not ok then return end
+    if not ok then return curr_node end
 
     local text = resp.content
 
     if config.stop_on_trigger_char and resp.stop then
-        if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return end
+        if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return curr_node end
         text = resp.stopping_word
     end
 
-    req.current_node[1] = req.trie:insert(text, req.current_node[1])
+    curr_node = trie:insert(text, curr_node)
 
     vim.schedule(function()
-        local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-        local current_middle = context.get_local_context(0).middle
-        local current_node = req.trie:find(current_middle)
-        if current_node then
-            local sug = req.trie:find_longest(current_node)
-            if #sug > 0 then suggestion.show(sug, row, col) end
+        local row, col = context.get_cursor_pos()
+        local line_prefix = context.get_line_prefix()
+        if pending_request then
+            local node = trie:find(line_prefix)
+            if node then
+                local sug = trie:find_longest(node)
+                if #sug > 0 then
+                    suggestion.show(sug, row, col)
+                else
+                    suggestion.clear()
+                end
+            end
         end
     end)
+
+    return curr_node
 end
 
----@param req quickfill.ActiveRequest
 ---@param code number
-local function on_stream_end(req, code)
+local function on_stream_end(code)
     if code ~= 0 then
-        logger.error("request llama infill, curl error", { code = code, req_id = req.req_id })
+        -- TODO: more info about error?
+        logger.error("request llama infill, curl error", { code = code })
         vim.schedule(function()
             vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
         end)
     end
 
-    if req.stdout then
-        req.stdout:read_stop()
-        req.stdout:close()
+    pending_request = nil
+
+    if handle then
+        handle:close()
+        handle = nil
     end
-    if req.handle then req.handle:close() end
-
-    active_requests[req.req_id] = nil
-
-    local sug = suggestion.get()
-    if #sug == 0 then return end
-
-    logger.info("request llama infill, stream stop", { req_id = req.req_id, suggestion = sug })
-
-    vim.schedule(function()
-        cache.add(req.local_context, sug)
-    end)
 end
 
-vim.keymap.set("n", "<leader>pt", function()
-    print(vim.inspect(M.tries))
-    print("active requests: " .. vim.tbl_count(active_requests))
-end)
-
----@param req_id number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param trie quickfill.Trie
----@param node quickfill.TrieNode
-local function request_infill(req_id, local_context, lsp_context, trie, node)
+---@param curr_node quickfill.TrieNode
+function M.request_infill(local_context, lsp_context, trie, curr_node)
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
+
+    M.cancel_stream()
 
     local stdout = assert(vim.uv.new_pipe(false), "failed to create stdout pipe")
     local stdin = assert(vim.uv.new_pipe(false), "failed to create stdin pipe")
 
-    -- Track current position in trie as we receive stream chunks
-    local current_node = { node }
+    pending_request = local_context.middle
 
-    ---@type quickfill.ActiveRequest
-    local req = {
-        req_id = req_id,
-        trie = trie,
-        node = node,
-        current_node = current_node,
-        local_context = local_context,
-    }
-
-    active_requests[req_id] = req
-
-    local handle
     handle = vim.uv.spawn("curl", {
         args = {
             ("%s/infill"):format(config.url),
@@ -164,66 +133,43 @@ local function request_infill(req_id, local_context, lsp_context, trie, node)
         },
         stdio = { stdin, stdout },
     }, function(code)
-        req.handle = handle
-        req.stdout = stdout
-        req.stdin = stdin
-        on_stream_end(req, code)
+        if stdout and not stdout:is_closing() then
+            stdout:read_stop()
+            stdout:close()
+        end
+        if stdin and not stdin:is_closing() then stdin:read_stop() end
+        on_stream_end(code)
     end)
 
-    req.handle = handle
-    req.stdout = stdout
-    req.stdin = stdin
-
     local payload = build_infill_payload(local_context, lsp_context)
-    logger.info("request llama infill, stream start", { req_id = req_id, prompt = local_context.middle })
+    logger.info("request llama infill, stream start", { prompt = local_context.middle })
     stdin:write(payload, function()
-        stdin:close()
+        if stdin and not stdin:is_closing() then stdin:close() end
     end)
 
     stdout:read_start(function(_, chunk)
         if not chunk then return end
-        on_stream_read(req, chunk)
+        curr_node = on_stream_read(chunk, trie, curr_node)
     end)
 end
 
-M.request_infill = request_infill
-
 function M.cancel_stream()
-    for req_id, req in pairs(active_requests) do
-        if req.handle and req.handle:is_active() and not req.handle:is_closing() then
-            pcall(req.handle.kill, req.handle)
-        end
-        if req.handle and not req.handle:is_closing() then pcall(req.handle.close, req.handle) end
-        if req.stdin and not req.stdin:is_closing() then pcall(req.stdin.close, req.stdin) end
-        if req.stdout and not req.stdout:is_closing() then
-            req.stdout:read_stop()
-            pcall(req.stdout.close, req.stdout)
-        end
-        active_requests[req_id] = nil
+    pending_request = nil
+    if handle and not handle:is_closing() then
+        handle:kill()
+        handle:close()
     end
-end
-
-local current_req = 0
-
----@return number
-function M.next_request_id()
-    current_req = current_req + 1
-    return current_req
+    handle = nil
 end
 
 ---@param buf number
 function M.suggest(buf)
     suggestion.clear()
 
-    local req_id = M.next_request_id()
-
-    ---@type number, number
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local row, col = context.get_cursor_pos()
 
     local local_context = context.get_local_context(buf)
-
-    if not M.tries[row] then M.tries[row] = Trie:new() end
-    local trie = M.tries[row] ---@cast trie quickfill.Trie
+    local trie = cache.get_or_add(local_context)
 
     local node = trie:find(local_context.middle)
     if node and (node.is_end or next(node.children)) then
@@ -232,6 +178,12 @@ function M.suggest(buf)
             suggestion.show(sug, row, col)
             return
         end
+        suggestion.clear()
+    end
+
+    if pending_request then
+        if local_context.middle:sub(1, #pending_request) == pending_request then return end
+        M.cancel_stream()
     end
 
     node = trie:insert(local_context.middle)
@@ -241,8 +193,14 @@ function M.suggest(buf)
         suggestion.show(sug, row, col)
         return
     end
+    suggestion.clear()
 
-    M.request_infill(req_id, local_context, { logit_bias = {} }, trie, node)
+    async.async(function()
+        local lsp_context = context.get_lsp_context(buf, local_context.middle)
+        vim.schedule(function()
+            M.request_infill(local_context, lsp_context, trie, node)
+        end)
+    end)()
 end
 
 return M

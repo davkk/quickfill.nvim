@@ -11,7 +11,7 @@ local function get_file_path()
     return vim.fs.joinpath(data_dir, file)
 end
 
----@return table<string, string>?, table<quickfill.ExtraChunk>?
+---@return table<string, quickfill.Trie>?, table<quickfill.ExtraChunk>?
 function M.load_persisted_data()
     local file_path = get_file_path()
     if vim.fn.filereadable(file_path) == 1 then
@@ -26,7 +26,7 @@ function M.load_persisted_data()
 end
 
 ---@class data
----@field cache table<string, string>
+---@field cache table<string, quickfill.Trie>
 ---@field extra_chunks table<quickfill.ExtraChunk>
 ---@param data data
 function M.save_persisted_data(data)
