@@ -28,24 +28,9 @@ function M.start()
     local request = require "quickfill.request"
     local suggestion = require "quickfill.suggestion"
     local config = require "quickfill.config"
-    local persist = require "quickfill.persist"
     local utils = require "quickfill.utils"
 
     M.group = vim.api.nvim_create_augroup("ai", { clear = true })
-
-    local loaded_cache, loaded_extra = persist.load_persisted_data()
-    cache.load(loaded_cache)
-    extra.load(loaded_extra)
-
-    vim.api.nvim_create_autocmd("VimLeave", {
-        group = M.group,
-        callback = function()
-            persist.save_persisted_data {
-                cache = cache.get_all(),
-                extra_chunks = extra.get_chunks(),
-            }
-        end,
-    })
 
     ---@param fn function
     local function accept(fn)
@@ -106,16 +91,7 @@ function M.stop()
     if not M.enabled then return end
     M.enabled = false
 
-    local persist = require "quickfill.persist"
-    local cache = require "quickfill.cache"
-    local extra = require "quickfill.extra"
-
     vim.api.nvim_clear_autocmds { group = M.group }
-
-    persist.save_persisted_data {
-        cache = cache.get_all(),
-        extra_chunks = extra.get_chunks(),
-    }
 
     pcall(vim.keymap.del, "i", "<Plug>(quickfill-accept)")
     pcall(vim.keymap.del, "i", "<Plug>(quickfill-accept-word)")

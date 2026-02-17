@@ -49,18 +49,4 @@ function M.get_all()
     return cache
 end
 
----@param loaded_cache table<string, quickfill.Trie>?
-function M.load(loaded_cache)
-    cache = {}
-    lru = {}
-    for key, data in pairs(loaded_cache or {}) do
-        local trie = Trie:new()
-        if data then
-            trie:deserialize(data)
-        end
-        cache[key] = trie
-        lru[#lru + 1] = key
-    end
-end
-
 return M

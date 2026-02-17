@@ -26,7 +26,6 @@ Features:
 - Smart caching for repeated contexts
 - Project-wide context chunks
 - Speculative infill
-- Persistent storage across sessions
 
 ==============================================================================
 INSTALLATION                                             *quickfill-install*
@@ -176,7 +175,7 @@ Run `:checkhealth quickfill` to validate:
 - External dependencies (curl, llama.cpp)
 - Server connectivity
 - Plugin initialization status
-- Cache and persistence health
+- Cache health
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

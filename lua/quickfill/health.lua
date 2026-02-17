@@ -63,32 +63,10 @@ local function check_plugin_state()
     vim.health.info(string.format("Extra chunks: %d", chunk_count))
 end
 
-local function check_persistence()
-    vim.health.start "quickfill: Persistence"
-
-    local data_dir = vim.fs.joinpath(vim.fn.stdpath "data", "quickfill")
-
-    if vim.fn.isdirectory(data_dir) == 1 then
-        vim.health.ok(string.format("Data directory exists: %s", data_dir))
-
-        local project_hash = vim.fn.sha256(vim.fs.root(0, ".git") or vim.fn.getcwd())
-        local data_file = vim.fs.joinpath(data_dir, project_hash .. ".json")
-
-        if vim.fn.filereadable(data_file) == 1 then
-            vim.health.ok "Project data file exists"
-        else
-            vim.health.info "No project data file (normal for new projects)"
-        end
-    else
-        vim.health.info "Data directory not created yet"
-    end
-end
-
 function M.check()
     check_dependencies()
     check_lsp()
     check_plugin_state()
-    check_persistence()
 end
 
 return M

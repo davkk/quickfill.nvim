@@ -76,16 +76,4 @@ function M.new()
     return Trie:new()
 end
 
----@param data quickfill.Trie
-function Trie:deserialize(data)
-    local function from_table(t, node)
-        node.is_end = t.is_end
-        for char, child_data in pairs(t.children or {}) do
-            node.children[char] = TrieNode:new()
-            from_table(child_data, node.children[char])
-        end
-    end
-    from_table(data.root, self.root)
-end
-
 return M

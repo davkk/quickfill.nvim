@@ -133,9 +133,4 @@ function M.get_chunks()
     return chunks
 end
 
----@param loaded_chunks table<quickfill.ExtraChunk>?
-function M.load(loaded_chunks)
-    chunks = loaded_chunks or {}
-end
-
 return M
