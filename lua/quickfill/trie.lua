@@ -2,7 +2,8 @@ local M = {}
 
 ---@class quickfill.TrieNode
 ---@field children table<string, quickfill.TrieNode>
----@field is_end boolean
+---@field longest_child string?
+---@field longest_depth number
 local TrieNode = {}
 TrieNode.__index = TrieNode
 
@@ -10,7 +11,8 @@ TrieNode.__index = TrieNode
 function TrieNode:new()
     return setmetatable({
         children = {},
-        is_end = false,
+        longest_child = nil,
+        longest_depth = 0,
     }, self)
 end
 
@@ -35,9 +37,16 @@ function Trie:insert(text, node)
     for i = 1, #text do
         local char = text:sub(i, i)
         if not node.children[char] then node.children[char] = TrieNode:new() end
+
+        local depth = #text - i + 1
+
+        if depth > node.longest_depth then
+            node.longest_child = char
+            node.longest_depth = depth
+        end
+
         node = node.children[char]
     end
-    node.is_end = true
     return node
 end
 
@@ -57,18 +66,12 @@ end
 ---@return string
 function Trie:find_longest(node)
     node = node or self.root
-    if not next(node.children) then return "" end
-
-    local longest = ""
-    local function dfs(n, prefix)
-        if n.is_end and #prefix > #longest then longest = prefix end
-        for char, child in pairs(n.children) do
-            dfs(child, prefix .. char)
-        end
+    local result = {}
+    while node.longest_child do
+        result[#result + 1] = node.longest_child
+        node = node.children[node.longest_child]
     end
-    dfs(node, "")
-
-    return longest
+    return table.concat(result)
 end
 
 ---@return quickfill.Trie

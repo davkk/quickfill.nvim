@@ -172,7 +172,7 @@ function M.suggest(buf)
     local trie = cache.get_or_add(local_context)
 
     local node = trie:find(local_context.middle)
-    if node and (node.is_end or next(node.children)) then
+    if node and next(node.children) then
         local sug = trie:find_longest(node)
         if #sug > 0 then
             suggestion.show(sug, row, col)
