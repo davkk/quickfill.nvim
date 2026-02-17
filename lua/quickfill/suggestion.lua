@@ -16,6 +16,7 @@ end
 ---@param row number
 ---@param col number
 function M.show(text, row, col)
+    M.clear()
     suggestion = text
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
         pcall(vim.api.nvim_buf_set_extmark, 0, ns, row - 1, col, {
