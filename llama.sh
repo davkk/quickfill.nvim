@@ -10,6 +10,5 @@ llama-server \
     --ctx-size 0 \
     --mlock \
     --cache-reuse 512 \
-    --verbose \
     --host $host \
     --port $port

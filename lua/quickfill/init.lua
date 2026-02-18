@@ -36,7 +36,7 @@ function M.start()
     local function accept(fn)
         if #suggestion.get() == 0 then return end
         if vim.fn.pumvisible() ~= 0 then
-            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-e>", true, false, true), "n", false)
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-x>", true, false, true), "n", false)
         end
         vim.schedule(fn)
     end
@@ -62,7 +62,7 @@ function M.start()
         end)()
     end)
 
-    vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "InsertEnter" }, {
+    vim.api.nvim_create_autocmd({ "CursorMovedI", "TextChangedP" }, {
         group = M.group,
         callback = function(ev)
             request.suggest(ev.buf)
