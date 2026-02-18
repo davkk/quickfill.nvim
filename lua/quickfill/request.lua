@@ -1,6 +1,6 @@
 local M = {}
 
-local async = require "quickfill.async"
+local a = require "quickfill.async"
 local utils = require "quickfill.utils"
 local config = require "quickfill.config"
 local suggestion = require "quickfill.suggestion"
@@ -163,7 +163,7 @@ function M.cancel_stream()
 end
 
 ---@param buf number
-function M.suggest(buf)
+M.suggest = a.sync(function(buf)
     suggestion.clear()
 
     local row, col = context.get_cursor_pos()
@@ -195,12 +195,9 @@ function M.suggest(buf)
     end
     suggestion.clear()
 
-    async.async(function()
-        local lsp_context = context.get_lsp_context(buf, local_context.middle)
-        vim.schedule(function()
-            M.request_infill(local_context, lsp_context, trie, node)
-        end)
-    end)()
-end
+    local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
+    a.wait(a.main_loop)
+    M.request_infill(local_context, lsp_context, trie, node)
+end)
 
 return M

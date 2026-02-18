@@ -6,7 +6,7 @@ vim.g.quickfill = {
 local test_utils = require "spec.test_utils"
 
 local context = require "quickfill.context"
-local async = require "quickfill.async"
+local a = require "quickfill.async"
 local utils = require "quickfill.utils"
 
 local function mock_clients()
@@ -93,11 +93,12 @@ describe("context", function()
         assert.are.same(expected, result)
     end)
 
-    it("should get lsp context", function()
-        local _test_done = false
-        local err = nil
-        async.async(function()
-            local result = context.get_lsp_context(buf, "")
+    it(
+        "should get lsp context",
+        a.sync(function()
+            local _test_done = false
+            local err = nil
+            local result = a.wait(context.get_lsp_context(buf, ""))
             local expected = {
                 logit_bias = {
                     ["("] = 3,
@@ -116,10 +117,10 @@ describe("context", function()
                 _test_done = true
                 assert.are.same(expected, result)
             end)
-        end)()
-        vim.wait(1000, function()
-            return _test_done
+            vim.wait(1000, function()
+                return _test_done
+            end)
+            assert.is_falsy(err)
         end)
-        assert.is_falsy(err)
-    end)
+    )
 end)

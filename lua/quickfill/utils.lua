@@ -2,6 +2,7 @@ local M = {}
 
 local config = require "quickfill.config"
 local logger = require "quickfill.logger"
+local a = require "quickfill.async"
 
 function M.fn(f, ...)
     local args = { ... }
@@ -36,18 +37,18 @@ function M.tbl_copy(tbl)
     return new
 end
 
----@param a string
----@param b string
+---@param left string
+---@param right string
 ---@return string, string, string
-function M.overlap(a, b)
-    local max_overlap = math.min(#a, #b)
+function M.overlap(left, right)
+    local max_overlap = math.min(#left, #right)
     local ol = 0
     for i = 1, max_overlap do
-        local a_end = a:sub(-i)
-        local b_start = b:sub(1, i)
+        local a_end = left:sub(-i)
+        local b_start = right:sub(1, i)
         if a_end == b_start then ol = i end
     end
-    return a:sub(1, #a - ol), a:sub(#a - ol + 1), b:sub(ol + 1)
+    return left:sub(1, #left - ol), left:sub(#left - ol + 1), right:sub(ol + 1)
 end
 
 ---@param bufnr integer
@@ -61,28 +62,26 @@ end
 
 ---@param route string
 ---@param payload string
-function M.request_json(route, payload)
-    return function(resume)
-        logger.info("request llama", { route = route })
-        vim.system({
-            "curl",
-            ("%s/%s"):format(config.url, route),
-            "-X",
-            "POST",
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            "@-",
-        }, { stdin = payload }, function(result)
-            if result.code == 0 then
-                logger.info("request llama", { route = route, code = result.code })
-                resume(nil, vim.json.decode(result.stdout))
-            else
-                logger.error("request llama", { route = route, error = result.stderr, code = result.code })
-                resume(result.stderr)
-            end
-        end)
-    end
-end
+M.request_json = a.wrap(function(route, payload, resume)
+    logger.info("request llama", { route = route })
+    vim.system({
+        "curl",
+        ("%s/%s"):format(config.url, route),
+        "-X",
+        "POST",
+        "-H",
+        "Content-Type: application/json",
+        "-d",
+        "@-",
+    }, { stdin = payload }, function(result)
+        if result.code == 0 then
+            logger.info("request llama", { route = route, code = result.code })
+            resume(nil, vim.json.decode(result.stdout))
+        else
+            logger.error("request llama", { route = route, error = result.stderr, code = result.code })
+            resume(result.stderr)
+        end
+    end)
+end)
 
 return M

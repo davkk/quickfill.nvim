@@ -1,6 +1,6 @@
 local M = {}
 
-local async = require "quickfill.async"
+local a = require "quickfill.async"
 local config = require "quickfill.config"
 local utils = require "quickfill.utils"
 local logger = require "quickfill.logger"
@@ -47,7 +47,7 @@ end
 
 ---@param buf number
 ---@param row number
-function M.try_add_chunk(buf, row)
+M.try_add_chunk = a.sync(function(buf, row)
     if not config.extra_chunks then return end
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
@@ -109,24 +109,22 @@ function M.try_add_chunk(buf, row)
 
     local input_extra = M.get_input_extra()
 
-    async.async(function()
-        async.await(utils.request_json(
-            "infill",
-            vim.json.encode {
-                input_prefix = "",
-                prompt = "",
-                input_suffix = "",
-                input_extra = input_extra,
-                cache_prompt = true,
-                samplers = {},
-                n_predict = 0,
-                max_tokens = 0,
-                t_max_predict_ms = 1,
-                response_fields = { "" },
-            }
-        ))
-    end)()
-end
+    a.wait(utils.request_json(
+        "infill",
+        vim.json.encode {
+            input_prefix = "",
+            prompt = "",
+            input_suffix = "",
+            input_extra = input_extra,
+            cache_prompt = true,
+            samplers = {},
+            n_predict = 0,
+            max_tokens = 0,
+            t_max_predict_ms = 1,
+            response_fields = { "" },
+        }
+    ))
+end)
 
 ---@return table<quickfill.ExtraChunk>
 function M.get_chunks()

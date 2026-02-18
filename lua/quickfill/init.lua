@@ -21,7 +21,7 @@ function M.start()
     if M.enabled then return end
     M.enabled = true
 
-    local async = require "quickfill.async"
+    local a = require "quickfill.async"
     local cache = require "quickfill.cache"
     local context = require "quickfill.context"
     local extra = require "quickfill.extra"
@@ -44,27 +44,30 @@ function M.start()
     vim.keymap.set("i", "<Plug>(quickfill-accept-word)", utils.fn(accept, suggestion.accept_word))
     vim.keymap.set("i", "<Plug>(quickfill-accept-replace)", utils.fn(accept, suggestion.accept_replace))
 
-    vim.keymap.set("i", "<Plug>(quickfill-trigger)", function()
-        local buf = vim.api.nvim_get_current_buf()
-        local local_context = context.get_local_context(buf)
+    vim.keymap.set(
+        "i",
+        "<Plug>(quickfill-trigger)",
+        a.sync(function()
+            local buf = vim.api.nvim_get_current_buf()
+            local local_context = context.get_local_context(buf)
 
-        request.cancel_stream()
-        suggestion.clear()
-        cache.remove_entry(local_context)
+            request.cancel_stream()
+            suggestion.clear()
+            cache.remove_entry(local_context)
 
-        async.async(function()
-            local lsp_context = context.get_lsp_context(buf, local_context.middle)
-            vim.schedule(function()
-                local trie = cache.get_or_add(local_context)
-                local node = trie:insert(local_context.middle)
-                request.request_infill(local_context, lsp_context, trie, node)
-            end)
-        end)()
-    end)
+            local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
+
+            a.wait(a.main_loop)
+            local trie = cache.get_or_add(local_context)
+            local node = trie:insert(local_context.middle)
+            request.request_infill(local_context, lsp_context, trie, node)
+        end)
+    )
 
     vim.api.nvim_create_autocmd({ "CursorMovedI", "TextChangedP" }, {
         group = M.group,
         callback = function(ev)
+            print("ev", ev.buf)
             request.suggest(ev.buf)
         end,
     })
