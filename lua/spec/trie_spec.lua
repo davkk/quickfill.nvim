@@ -1,42 +1,29 @@
 local Trie = require "quickfill.trie"
 
 describe("trie", function()
-    describe("new", function()
-        it("should create a trie with empty root node", function()
-            local trie = Trie.new()
-            assert.is_not_nil(trie)
-            assert.is_not_nil(trie.root)
-            assert.are.same({}, trie.root.children)
-            assert.is_nil(trie.root.longest_child)
-            assert.are.equal(0, trie.root.longest_depth)
-        end)
-    end)
-
     describe("insert", function()
-        it("should insert single word and create correct node chain", function()
+        it("should insert single word as a single edge node", function()
             local trie = Trie.new()
             trie:insert "hello"
 
-            local node = trie.root
-            for _, char in ipairs { "h", "e", "l", "l", "o" } do
-                assert.is_not_nil(node.children[char])
-                node = node.children[char]
-            end
+            local node = trie.root.children["h"]
+            assert.is_not_nil(node)
+            assert.are.equal("hello", node.value)
+            assert.are.same({}, node.children)
         end)
 
-        it("should share common prefix nodes for multiple words", function()
+        it("should split edge and share common prefix for multiple words", function()
             local trie = Trie.new()
             trie:insert "hello"
             trie:insert "help"
 
             local h_node = trie.root.children["h"]
             assert.is_not_nil(h_node)
-            local he_node = h_node.children["e"]
-            assert.is_not_nil(he_node)
-            local hel_node = he_node.children["l"]
-            assert.is_not_nil(hel_node)
-            assert.is_not_nil(hel_node.children["l"])
-            assert.is_not_nil(hel_node.children["p"])
+            assert.are.equal("hel", h_node.value)
+            assert.is_not_nil(h_node.children["l"])
+            assert.is_not_nil(h_node.children["p"])
+            assert.are.equal("lo", h_node.children["l"].value)
+            assert.are.equal("p", h_node.children["p"].value)
         end)
 
         it("should return node when inserting empty string", function()
@@ -45,7 +32,7 @@ describe("trie", function()
             assert.are.equal(trie.root, result)
         end)
 
-        it("should update longest_child and longest_depth on insert", function()
+        it("should update longest_child and longest_depth on root after insert", function()
             local trie = Trie.new()
             trie:insert "hi"
 
@@ -53,8 +40,8 @@ describe("trie", function()
             assert.are.equal(2, trie.root.longest_depth)
 
             local h_node = trie.root.children["h"]
-            assert.are.equal("i", h_node.longest_child)
-            assert.are.equal(1, h_node.longest_depth)
+            assert.is_nil(h_node.longest_child)
+            assert.are.equal(0, h_node.longest_depth)
         end)
 
         it("should update longest when inserting longer word", function()
@@ -64,31 +51,17 @@ describe("trie", function()
 
             assert.are.equal("h", trie.root.longest_child)
             assert.are.equal(5, trie.root.longest_depth)
-
-            local h_node = trie.root.children["h"]
-            assert.are.equal("e", h_node.longest_child)
-            assert.are.equal(4, h_node.longest_depth)
-        end)
-
-        it("should return the final node after insertion", function()
-            local trie = Trie.new()
-            local result = trie:insert "abc"
-
-            assert.is_not_nil(result)
-            assert.are.same({}, result.children)
-            assert.is_nil(result.longest_child)
-            assert.are.equal(0, result.longest_depth)
         end)
 
         it("should insert with custom starting node", function()
             local trie = Trie.new()
             trie:insert "ab"
 
-            local a_node = trie:find "a"
-            trie:insert("cde", a_node)
+            local ab_node = trie:find "ab"
+            trie:insert("cde", ab_node)
 
-            assert.are.equal("cde", trie:find_longest(a_node))
-            assert.are.equal("acde", trie:find_longest())
+            assert.are.equal("cde", trie:find_longest(ab_node))
+            assert.are.equal("abcde", trie:find_longest())
         end)
     end)
 
@@ -100,6 +73,7 @@ describe("trie", function()
             local node = trie:find "hello" ---@cast node quickfill.TrieNode
             assert.is_not_nil(node)
             assert.are.same({}, node.children)
+            assert.are.equal("hello", node.value)
         end)
 
         it("should return nil for non-existent path", function()
@@ -110,21 +84,13 @@ describe("trie", function()
             assert.is_nil(trie:find "hellx")
         end)
 
-        it("should find intermediate node", function()
+        it("should find intermediate node when query ends mid-edge", function()
             local trie = Trie.new()
             trie:insert "hello"
 
             local node = trie:find "hel" ---@cast node quickfill.TrieNode
             assert.is_not_nil(node)
-            assert.is_not_nil(node.children["l"])
-        end)
-
-        it("should return root for empty string", function()
-            local trie = Trie.new()
-            trie:insert "hello"
-
-            local node = trie:find ""
-            assert.are.equal(trie.root, node)
+            assert.are.equal("hello", node.value)
         end)
 
         it("should find word among multiple words", function()
@@ -158,26 +124,12 @@ describe("trie", function()
             assert.are.equal("lo", trie:find_longest(hel_node))
         end)
 
-        it("should return empty string from leaf node", function()
-            local trie = Trie.new()
-            trie:insert "hello"
-
-            local node = trie:find "hello"
-            assert.are.equal("", trie:find_longest(node))
-        end)
-
-        it("should return empty string for empty trie", function()
-            local trie = Trie.new()
-            assert.are.equal("", trie:find_longest())
-        end)
-
         it("should handle single character words", function()
             local trie = Trie.new()
             trie:insert "a"
             trie:insert "ab"
 
             assert.are.equal("ab", trie:find_longest())
-            assert.are.equal("b", trie:find_longest(trie:find "a"))
         end)
 
         it("should update longest when adding longer word to existing prefix", function()

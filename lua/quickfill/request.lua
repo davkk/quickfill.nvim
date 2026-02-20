@@ -73,9 +73,9 @@ local function on_stream_read(chunk, trie, curr_node)
         local row, col = context.get_cursor_pos()
         local line_prefix = context.get_line_prefix()
         if pending_request then
-            local node = trie:find(line_prefix)
+            local node, tail = trie:find(line_prefix)
             if node then
-                local sug = trie:find_longest(node)
+                local sug = trie:find_longest(node, tail)
                 if #sug > 0 then
                     suggestion.show(sug, row, col)
                 else
@@ -171,9 +171,9 @@ M.suggest = a.sync(function(buf)
     local local_context = context.get_local_context(buf)
     local trie = cache.get_or_add(local_context)
 
-    local node = trie:find(local_context.middle)
+    local node, tail = trie:find(local_context.middle)
     if node and next(node.children) then
-        local sug = trie:find_longest(node)
+        local sug = trie:find_longest(node, tail)
         if #sug > 0 then
             suggestion.show(sug, row, col)
             return
@@ -188,7 +188,7 @@ M.suggest = a.sync(function(buf)
 
     node = trie:insert(local_context.middle)
 
-    local sug = trie:find_longest(node)
+    local sug = trie:find_longest(node) -- after insert, the node represents an exact match
     if #sug > 0 then
         suggestion.show(sug, row, col)
         return
