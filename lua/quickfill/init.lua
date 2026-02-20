@@ -67,7 +67,6 @@ function M.start()
     vim.api.nvim_create_autocmd({ "CursorMovedI", "TextChangedP" }, {
         group = M.group,
         callback = function(ev)
-            print("ev", ev.buf)
             request.suggest(ev.buf)
         end,
     })
