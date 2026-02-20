@@ -1,9 +1,5 @@
 ---@class quickfill.Config
 ---@field url? string Llama server URL
----@field n_predict? integer Max tokens to predict
----@field top_k? integer Top-k sampling
----@field top_p? number Top-p sampling
----@field repeat_penalty? number Repeat penalty
 ---@field stop_chars? string[] Stop characters
 ---@field stop_on_trigger_char? boolean Stop on stop chars
 ---@field n_prefix? integer Prefix lines
@@ -23,21 +19,16 @@ vim.g.quickfill = vim.g.quickfill
 local default_config = {
     url = "http://localhost:8012",
 
-    n_predict = 8,
-    top_k = 20,
-    top_p = 0.3,
-    repeat_penalty = 1.5,
-
     stop_chars = { "\n", "\r", "\r\n" },
-    stop_on_trigger_char = true,
+    stop_on_trigger_char = false,
 
-    n_prefix = 32,
+    n_prefix = 16,
     n_suffix = 16,
 
     max_cache_entries = 32,
 
-    extra_chunks = false,
-    max_extra_chunks = 8,
+    extra_chunks = true,
+    max_extra_chunks = 6,
     chunk_lines = 16,
 
     lsp_completion = true,
@@ -53,10 +44,6 @@ local config = vim.tbl_deep_extend("force", default_config, user_config)
 
 local ok, err = pcall(vim.validate, {
     url = { config.url, "string" },
-    n_predict = { config.n_predict, "number" },
-    top_k = { config.top_k, "number" },
-    top_p = { config.top_p, "number" },
-    repeat_penalty = { config.repeat_penalty, "number" },
     stop_chars = { config.stop_chars, "table" },
     stop_on_trigger_char = { config.stop_on_trigger_char, "boolean" },
     n_prefix = { config.n_prefix, "number" },
