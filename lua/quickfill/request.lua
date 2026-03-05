@@ -31,12 +31,19 @@ local function build_infill_payload(local_context, lsp_context)
     end
 
     return vim.json.encode {
+        model = config.model,
         input_prefix = local_context.prefix,
         prompt = local_context.middle,
         input_suffix = local_context.suffix,
         input_extra = input_extra,
         cache_prompt = true,
-        samplers = { "top_k", "top_p", "infill" },
+        n_predict = config.n_predict,
+        temperature = config.temperature,
+        top_k = config.top_k,
+        top_p = config.top_p,
+        repeat_penalty = config.repeat_penalty,
+        presence_penalty = config.presence_penalty,
+        samplers = { "top_k", "top_p", "temperature", "infill" },
         logit_bias = lsp_context.logit_bias,
         t_max_predict_ms = 500,
         stream = true,

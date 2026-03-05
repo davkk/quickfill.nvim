@@ -195,6 +195,7 @@ local get_logit_bias = a.sync(function(completions)
     local err, tokenize_resp = a.wait(utils.request_json(
         "tokenize",
         vim.json.encode {
+            model = config.model,
             content = content,
             with_pieces = true,
         }

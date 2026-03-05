@@ -112,6 +112,7 @@ M.try_add_chunk = a.sync(function(buf, row)
     a.wait(utils.request_json(
         "infill",
         vim.json.encode {
+            model = config.model,
             input_prefix = "",
             prompt = "",
             input_suffix = "",

@@ -1,5 +1,12 @@
 ---@class quickfill.Config
----@field url? string Llama server URL
+---@field url? string Server URL
+---@field model? string Model name
+---@field n_predict? integer Max tokens to predict
+---@field temperature? number Temperature
+---@field top_k? integer Top-k sampling
+---@field top_p? number Top-p sampling
+---@field repeat_penalty? number Repeat penalty
+---@field presence_penalty? number Presence penalty
 ---@field stop_chars? string[] Stop characters
 ---@field stop_on_trigger_char? boolean Stop on stop chars
 ---@field n_prefix? integer Prefix lines
@@ -17,7 +24,13 @@ vim.g.quickfill = vim.g.quickfill
 
 ---@type quickfill.Config
 local default_config = {
-    url = "http://localhost:8012",
+    url = "http://localhost:8080",
+    n_predict = 32,
+    temperature = 0.3,
+    top_k = 20,
+    top_p = 0.9,
+    repeat_penalty = 1.05,
+    presence_penalty = 0,
 
     stop_chars = { "\n", "\r", "\r\n" },
     stop_on_trigger_char = false,
@@ -44,6 +57,13 @@ local config = vim.tbl_deep_extend("force", default_config, user_config)
 
 local ok, err = pcall(vim.validate, {
     url = { config.url, "string" },
+    model = { config.model, "string" },
+    n_predict = { config.n_predict, "number" },
+    temperature = { config.temperature, "number" },
+    top_k = { config.top_k, "number" },
+    top_p = { config.top_p, "number" },
+    repeat_penalty = { config.repeat_penalty, "number" },
+    presence_penalty = { config.presence_penalty, "number" },
     stop_chars = { config.stop_chars, "table" },
     stop_on_trigger_char = { config.stop_on_trigger_char, "boolean" },
     n_prefix = { config.n_prefix, "number" },
