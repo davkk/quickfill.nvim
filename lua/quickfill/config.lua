@@ -27,14 +27,14 @@ vim.g.quickfill = vim.g.quickfill
 ---@type quickfill.Config
 local default_config = {
     url = "http://localhost:8080",
-    n_predict = 32,
+    n_predict = 128,
     temperature = 0.3,
     top_k = 20,
     top_p = 0.9,
     repeat_penalty = 1.05,
     presence_penalty = 0,
 
-    stop_chars = { "\n", "\r", "\r\n" },
+    stop_chars = {},
     trigger_chars = { ".", ":", "[", "{", "(" },
     fresh_on_trigger_char = true,
     stop_on_trigger_char = false,
