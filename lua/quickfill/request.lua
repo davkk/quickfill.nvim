@@ -25,7 +25,7 @@ local function build_infill_payload(local_context, lsp_context)
 
     local stop = utils.tbl_copy(config.stop_chars or {})
     if config.stop_on_trigger_char then
-        for _, char in ipairs { ".", ":", "[", "{", "(" } do
+        for _, char in ipairs(config.trigger_chars) do
             stop[#stop + 1] = char
         end
     end

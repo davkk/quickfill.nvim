@@ -8,7 +8,9 @@
 ---@field repeat_penalty? number Repeat penalty
 ---@field presence_penalty? number Presence penalty
 ---@field stop_chars? string[] Stop characters
----@field stop_on_trigger_char? boolean Stop on stop chars
+---@field trigger_chars? string[] Trigger characters
+---@field fresh_on_trigger_char? boolean Make fresh request on trigger char
+---@field stop_on_trigger_char? boolean Stop generating on trigger char
 ---@field n_prefix? integer Prefix lines
 ---@field n_suffix? integer Suffix lines
 ---@field max_cache_entries? integer Max cache entries
@@ -33,6 +35,8 @@ local default_config = {
     presence_penalty = 0,
 
     stop_chars = { "\n", "\r", "\r\n" },
+    trigger_chars = { ".", ":", "[", "{", "(" },
+    fresh_on_trigger_char = true,
     stop_on_trigger_char = false,
 
     n_prefix = 16,
@@ -65,6 +69,8 @@ local ok, err = pcall(vim.validate, {
     repeat_penalty = { config.repeat_penalty, "number" },
     presence_penalty = { config.presence_penalty, "number" },
     stop_chars = { config.stop_chars, "table" },
+    trigger_chars = { config.trigger_chars, "table" },
+    fresh_on_trigger_char = { config.fresh_on_trigger_char, "boolean" },
     stop_on_trigger_char = { config.stop_on_trigger_char, "boolean" },
     n_prefix = { config.n_prefix, "number" },
     n_suffix = { config.n_suffix, "number" },

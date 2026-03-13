@@ -44,30 +44,40 @@ function M.start()
     vim.keymap.set("i", "<Plug>(quickfill-accept-word)", utils.fn(accept, suggestion.accept_word))
     vim.keymap.set("i", "<Plug>(quickfill-accept-replace)", utils.fn(accept, suggestion.accept_replace))
 
-    vim.keymap.set(
-        "i",
-        "<Plug>(quickfill-trigger)",
-        a.sync(function()
-            local buf = vim.api.nvim_get_current_buf()
-            local local_context = context.get_local_context(buf)
+    local fresh_request = a.sync(function()
+        local buf = vim.api.nvim_get_current_buf()
+        local local_context = context.get_local_context(buf)
 
-            request.cancel_stream()
-            suggestion.clear()
-            cache.remove_entry(local_context)
+        request.cancel_stream()
+        suggestion.clear()
+        cache.remove_entry(local_context)
 
-            local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
+        local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
 
-            a.wait(a.main_loop)
-            local trie = cache.get_or_add(local_context)
-            local node = trie:insert(local_context.middle)
-            request.request_infill(local_context, lsp_context, trie, node)
-        end)
-    )
+        a.wait(a.main_loop)
+        local trie = cache.get_or_add(local_context)
+        local node = trie:insert(local_context.middle)
+        request.request_infill(local_context, lsp_context, trie, node)
+    end)
+    vim.keymap.set("i", "<Plug>(quickfill-trigger)", fresh_request)
+
+    local last_char = ""
+    vim.api.nvim_create_autocmd("InsertCharPre", {
+        group = M.group,
+        callback = function()
+            last_char = vim.v.char
+        end,
+    })
 
     vim.api.nvim_create_autocmd({ "CursorMovedI", "TextChangedP" }, {
         group = M.group,
         callback = function(ev)
-            request.suggest(ev.buf)
+            if config.fresh_on_trigger_char and vim.tbl_contains(config.trigger_chars, last_char) then
+                fresh_request()
+                last_char = ""
+            else
+                request.suggest(ev.buf)
+            end
         end,
     })
 
