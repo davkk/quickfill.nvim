@@ -34,7 +34,7 @@ local default_config = {
     repeat_penalty = 1.05,
     presence_penalty = 0,
 
-    stop_chars = {},
+    stop_chars = { "\n", "\r", "\r\n" },
     trigger_chars = { ".", ":", "[", "{", "(" },
     fresh_on_trigger_char = true,
     stop_on_trigger_char = false,

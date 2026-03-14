@@ -43,8 +43,9 @@ function M.get_local_context(buf)
         prefix = prefix:sub(-10):gsub("\n", "\\n"),
         middle = curr_prefix:gsub("\n", "\\n"),
         suffix = suffix:sub(1, 10):gsub("\n", "\\n"),
+        curr_suffix = curr_suffix
     })
-    return { prefix = prefix, middle = curr_prefix, suffix = suffix }
+    return { prefix = prefix, middle = curr_prefix, suffix = suffix, curr_suffix = curr_suffix }
 end
 
 ---@param method string

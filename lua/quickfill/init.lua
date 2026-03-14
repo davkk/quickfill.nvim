@@ -2,6 +2,7 @@
 ---@field prefix string
 ---@field middle string
 ---@field suffix string
+---@field curr_suffix string
 
 ---@class quickfill.LspContext
 ---@field logit_bias table<string, string>

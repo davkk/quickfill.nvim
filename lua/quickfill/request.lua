@@ -47,7 +47,7 @@ local function build_infill_payload(local_context, lsp_context)
         logit_bias = lsp_context.logit_bias,
         t_max_predict_ms = 500,
         stream = true,
-        stop = stop,
+        stop = #local_context.curr_suffix > 0 and stop or {},
     }
 end
 
