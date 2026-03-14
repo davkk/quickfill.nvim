@@ -90,8 +90,9 @@ local function on_stream_read(chunk, trie, curr_node)
     return curr_node
 end
 
+---@param buf number
 ---@param code number
-local function on_stream_end(code)
+local function on_stream_end(buf, code)
     if code ~= 0 then
         -- TODO: more info about error?
         logger.error("request llama infill, curl error", { code = code })
@@ -106,13 +107,35 @@ local function on_stream_end(code)
         handle:close()
         handle = nil
     end
+
+    vim.schedule(function()
+        local lines = vim.split(suggestion.get(), "\n")
+        local local_context = context.get_local_context(buf)
+        local prefix_lines = vim.split(local_context.prefix, "\n")
+        lines[1] = prefix_lines[#prefix_lines] .. local_context.middle .. lines[1]
+        table.remove(prefix_lines, #prefix_lines)
+        for idx = 2, #lines do
+            table.remove(prefix_lines, 1)
+            prefix_lines[#prefix_lines + 1] = lines[idx - 1]
+            ---@type quickfill.LocalContext
+            local new_context = {
+                prefix = table.concat(prefix_lines, "\n") .. "\n",
+                middle = "",
+                suffix = local_context.suffix,
+                curr_suffix = "",
+            }
+            local trie = cache.get_or_add(new_context)
+            trie:insert(table.concat({ unpack(lines, idx) }, "\n"))
+        end
+    end)
 end
 
+---@param buf number
 ---@param local_context quickfill.LocalContext
 ---@param lsp_context quickfill.LspContext
 ---@param trie quickfill.Trie
 ---@param curr_node quickfill.TrieNode
-function M.request_infill(local_context, lsp_context, trie, curr_node)
+function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
     M.cancel_stream()
@@ -140,7 +163,7 @@ function M.request_infill(local_context, lsp_context, trie, curr_node)
             stdout:close()
         end
         if stdin and not stdin:is_closing() then stdin:read_stop() end
-        on_stream_end(code)
+        on_stream_end(buf, code)
     end)
 
     local payload = build_infill_payload(local_context, lsp_context)
@@ -199,7 +222,7 @@ M.suggest = a.sync(function(buf)
 
     local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
     a.wait(a.main_loop)
-    M.request_infill(local_context, lsp_context, trie, node)
+    M.request_infill(buf, local_context, lsp_context, trie, node)
 end)
 
 return M

@@ -17,7 +17,6 @@ end
 ---@param row number
 ---@param col number
 function M.show(text, row, col)
-    -- Clear previous suggestions to avoid ghost text accumulation
     vim.api.nvim_buf_clear_namespace(0, ns, 0, -1)
 
     suggestion = text
@@ -26,15 +25,13 @@ function M.show(text, row, col)
     local lines = vim.split(text, "\n", { plain = true })
     if #lines == 0 then return end
 
-    -- Show first line as inline virtual text
     local first_line = lines[1]:gsub(" ", "·")
     local extmark_opts = {
         virt_text = { { first_line, "Comment" } },
         virt_text_pos = "overlay",
     }
 
-    -- Show remaining lines as virtual lines below
-    if #lines > 1 then
+    if #lines > 1 and #first_line == 0 then
         local virt_lines = {}
         for i = 2, #lines do
             virt_lines[i - 1] = { { lines[i]:gsub(" ", "·"), "Comment" } }
@@ -56,22 +53,16 @@ function M.accept()
     local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]
     local suffix = line:sub(col + 1)
 
-    -- Handle overlap with suffix for the first line
-    local _, _, remaining_suffix = utils.overlap(lines[1], suffix)
-    lines[1] = lines[1] .. remaining_suffix
-
-    -- If there's a suffix and we're inserting multiple lines,
-    -- we need to append the remaining suffix to the last inserted line
-    if #lines > 1 and #suffix > 0 then
-        lines[#lines] = lines[#lines] .. suffix
+    local new_text = utils.overlap(lines[1], suffix)
+    if #new_text > 0 then
+        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
+        vim.api.nvim_win_set_cursor(0, { row, col + #lines[1] })
+    else
+        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, lines)
+        local new_row = row + #lines - 1
+        local new_col = #lines == 1 and col + #lines[1] or #lines[#lines]
+        vim.api.nvim_win_set_cursor(0, { new_row, new_col })
     end
-
-    vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, lines)
-
-    -- Calculate cursor position at end of suggestion
-    local new_row = row + #lines - 1
-    local new_col = #lines == 1 and col + #lines[1] or #lines[#lines]
-    vim.api.nvim_win_set_cursor(0, { new_row, new_col })
 
     logger.info("suggestion accept", { suggestion = suggestion, row = row, col = col })
 
@@ -83,33 +74,16 @@ function M.accept_word()
     if #suggestion == 0 then return end
 
     local lines = vim.split(suggestion, "\n", { plain = true })
+    local first_line = lines[1]
+    local match = first_line:match "^.-[%a%d_]+"
+
     local word
-
-    if #lines == 1 then
-        -- Single line suggestion - use original logic
-        local match = suggestion:match "^.-[%a%d_]+"
-        word = match or suggestion
+    if match and #match > 0 then
+        word = match
+    elseif #lines > 1 then
+        word = first_line .. "\n"
     else
-        -- Multiline suggestion
-        local first_line = lines[1]
-        local match = first_line:match "^.-[%a%d_]+"
-
-        if match and #match > 0 then
-            -- First line has a word to accept
-            word = match
-        else
-            -- First line has no word (only whitespace/special chars)
-            -- Accept the entire first line including newline, and the first word of next line
-            word = first_line .. "\n"
-            if lines[2] then
-                local next_match = lines[2]:match "^.-[%a%d_]+"
-                if next_match then
-                    word = word .. next_match
-                else
-                    word = word .. lines[2]
-                end
-            end
-        end
+        word = first_line
     end
 
     if #word == 0 then return end
@@ -119,30 +93,19 @@ function M.accept_word()
     local suffix = line:sub(col + 1)
 
     local word_lines = vim.split(word, "\n", { plain = true })
-    if #word_lines == 1 then
-        -- Single line word - original logic
-        local new_text = utils.overlap(word, suffix)
-        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
-        vim.api.nvim_win_set_cursor(0, { row, col + #word })
-    else
-        -- Multiline word
-        local _, _, remaining_suffix = utils.overlap(word_lines[1], suffix)
-        word_lines[1] = word_lines[1] .. remaining_suffix
-        if #suffix > 0 then
-            word_lines[#word_lines] = word_lines[#word_lines] .. suffix
-        end
-        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, word_lines)
-        local new_row = row + #word_lines - 1
-        local new_col = #word_lines == 1 and col + #word_lines[1] or #word_lines[#word_lines]
-        vim.api.nvim_win_set_cursor(0, { new_row, new_col })
-    end
+    local _, _, remaining_suffix = utils.overlap(word_lines[1], suffix)
+    word_lines[1] = word_lines[1] .. remaining_suffix
+
+    vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, word_lines)
+
+    local new_row = row + #word_lines - 1
+    local new_col = #word_lines == 1 and col + #word_lines[1] or #word_lines[#word_lines]
+    vim.api.nvim_win_set_cursor(0, { new_row, new_col })
 
     logger.info("suggestion accept word", { word = word, row = row, col = col })
 
     suggestion = suggestion:sub(#word + 1)
 
-    -- Calculate new position for showing remaining suggestion
-    local new_row, new_col = context.get_cursor_pos()
     if #suggestion > 0 then
         M.show(suggestion, new_row, new_col)
     else
@@ -157,7 +120,6 @@ function M.accept_replace()
 
     vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, lines)
 
-    -- Calculate cursor position at end of suggestion
     local new_row = row + #lines - 1
     local new_col = #lines == 1 and col + #lines[1] or #lines[#lines]
     vim.api.nvim_win_set_cursor(0, { new_row, new_col })

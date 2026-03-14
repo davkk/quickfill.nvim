@@ -58,7 +58,7 @@ function M.start()
         a.wait(a.main_loop)
         local trie = cache.get_or_add(local_context)
         local node = trie:insert(local_context.middle)
-        request.request_infill(local_context, lsp_context, trie, node)
+        request.request_infill(buf, local_context, lsp_context, trie, node)
     end)
     vim.keymap.set("i", "<Plug>(quickfill-trigger)", fresh_request)
 
