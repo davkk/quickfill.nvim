@@ -64,7 +64,7 @@ function M.accept()
         vim.api.nvim_win_set_cursor(0, { new_row, new_col })
     end
 
-    logger.info("suggestion accept", { suggestion = suggestion, row = row, col = col })
+    logger.debug("suggestion accept", { suggestion = suggestion, row = row, col = col })
 
     M.clear()
     suggestion = ""
@@ -102,7 +102,7 @@ function M.accept_word()
     local new_col = #word_lines == 1 and col + #word_lines[1] or #word_lines[#word_lines]
     vim.api.nvim_win_set_cursor(0, { new_row, new_col })
 
-    logger.info("suggestion accept word", { word = word, row = row, col = col })
+    logger.debug("suggestion accept word", { word = word, row = row, col = col })
 
     suggestion = suggestion:sub(#word + 1)
 
@@ -124,7 +124,7 @@ function M.accept_replace()
     local new_col = #lines == 1 and col + #lines[1] or #lines[#lines]
     vim.api.nvim_win_set_cursor(0, { new_row, new_col })
 
-    logger.info("suggestion accept replace", { suggestion = suggestion, row = row, col = col })
+    logger.debug("suggestion accept replace", { suggestion = suggestion, row = row, col = col })
 
     M.clear()
     suggestion = ""

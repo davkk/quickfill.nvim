@@ -39,7 +39,7 @@ function M.get_local_context(buf)
         .. table.concat(lines, "\n", math.min(#lines + 1, row + 1), math.min(#lines, row + config.n_suffix))
         .. "\n"
 
-    logger.info("context local", {
+    logger.debug("context local", {
         prefix = prefix:sub(-10):gsub("\n", "\\n"),
         middle = curr_prefix:gsub("\n", "\\n"),
         suffix = suffix:sub(1, 10):gsub("\n", "\\n"),
@@ -61,7 +61,7 @@ end
 ---@param buf number
 ---@param params table
 local lsp_request = a.sync(function(buf, method, params)
-    logger.info("context lsp send", { buf = buf, method = method, params = params })
+    logger.debug("context lsp send", { buf = buf, method = method, params = params })
 
     if not is_supported(buf, method) then
         logger.warn("context lsp, buffer does not support method", { buf = buf, method = method, params = params })
@@ -83,7 +83,7 @@ local lsp_request = a.sync(function(buf, method, params)
                 if active_cancels[buf] then active_cancels[buf][method] = nil end
                 timer:stop()
                 timer:close()
-                logger.info("context lsp receive", { buf = buf, method = method, params = params, results = res })
+                logger.debug("context lsp receive", { buf = buf, method = method, params = params, results = res })
                 callback(res)
             end
         end)
@@ -127,7 +127,7 @@ local get_lsp_signature_help = a.sync(function(buf, params)
             break
         end
         if resp.result then
-            logger.info("context lsp", { buf = buf, method = "signatureHelp", params = params })
+            logger.debug("context lsp", { buf = buf, method = "signatureHelp", params = params })
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
                 if sig.label then signature[#signature + 1] = sig.label end
@@ -154,12 +154,12 @@ local get_lsp_completion = a.sync(function(buf, params, line_prefix)
     local completions = {}
     for _, resp in ipairs(cmp_resp) do
         if resp.err then
-            logger.error("context lsp", { buf = buf, method = "signatureHelp", error = resp.err, params = params })
+            logger.error("context lsp", { buf = buf, method = "completion", error = resp.err, params = params })
             vim.notify(("error while lsp completion: %s"):format(resp.err.message), vim.diagnostic.severity.ERROR)
             break
         end
         if resp.result then
-            logger.info("context lsp", { buf = buf, method = "completion", params = params })
+            logger.debug("context lsp", { buf = buf, method = "completion", params = params })
             for _, item in ipairs(resp.result.items or resp.result or {}) do
                 if num_items >= config.max_lsp_completion_items then break end
                 if

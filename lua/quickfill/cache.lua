@@ -1,6 +1,7 @@
 local M = {}
 
 local config = require "quickfill.config"
+local logger = require "quickfill.logger"
 local Trie = require "quickfill.trie"
 
 ---@type table<string, quickfill.Trie>
@@ -35,6 +36,7 @@ function M.get_or_add(context)
     if not cache[key] then
         if vim.tbl_count(cache) > config.max_cache_entries - 1 then
             local least_used = lru[1]
+            logger.debug("cache evict", { key = least_used })
             cache[least_used] = nil
             table.remove(lru, 1)
         end

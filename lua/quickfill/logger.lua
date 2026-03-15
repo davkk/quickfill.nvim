@@ -1,21 +1,28 @@
 local M = {}
 
+local DEBUG = -1
 local INFO = 0
 local WARN = 5
 local ERROR = 10
 
 local levels = {
+    [DEBUG] = "DEBUG",
     [INFO] = "INFO",
     [WARN] = "WARN",
     [ERROR] = "ERROR",
 }
 
+local min_level = (vim.env.QUICKFILL_LOG_LEVEL == "debug" and DEBUG)
+    or (vim.env.QUICKFILL_LOG_LEVEL == "warn" and WARN)
+    or (vim.env.QUICKFILL_LOG_LEVEL == "error" and ERROR)
+    or INFO
+
 local log_path = vim.fs.joinpath(vim.fn.stdpath "state", "quickfill.log")
 local fd, fd_err = vim.uv.fs_open(log_path, "a", 438)
 if not fd then error("unable to open log file: " .. log_path .. " " .. (fd_err or "")) end
 
---- @param data table
---- @return string
+---@param data table
+---@return string
 local function stringify_table(data)
     local out = {}
     for k, v in pairs(data) do
@@ -31,10 +38,11 @@ local function stringify_table(data)
     return table.concat(out, ", ")
 end
 
---- @param level number
---- @param msg string
---- @param data table?
+---@param level number
+---@param msg string
+---@param data table?
 function M.log(level, msg, data)
+    if level < min_level then return end
     local _, b = math.modf(os.clock())
     local timestamp = os.date("%Y-%m-%d %H:%M:%S.", os.time()) .. tostring(b):sub(3, 5)
     local level_str = levels[level]
@@ -43,20 +51,26 @@ function M.log(level, msg, data)
     if not success then error("unable to write to log: " .. (err or "")) end
 end
 
---- @param msg string
---- @param data table?
+---@param msg string
+---@param data table?
 function M.info(msg, data)
     M.log(INFO, msg, data)
 end
 
---- @param msg string
---- @param data table?
+---@param msg string
+---@param data table?
+function M.debug(msg, data)
+    M.log(DEBUG, msg, data)
+end
+
+---@param msg string
+---@param data table?
 function M.warn(msg, data)
     M.log(WARN, msg, data)
 end
 
---- @param msg string
---- @param data table?
+---@param msg string
+---@param data table?
 function M.error(msg, data)
     M.log(ERROR, msg, data)
 end

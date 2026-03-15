@@ -95,17 +95,17 @@ M.try_add_chunk = a.sync(function(buf, row)
     for idx, chunk in ipairs(chunks) do
         local sim = similarity(lines, chunk.lines)
         if sim > 0.55 then
-            logger.info("extra remove chunk", { idx = idx, sim = sim })
+            logger.debug("extra remove chunk", { idx = idx, sim = sim })
             table.remove(chunks, idx)
         end
     end
 
     if #chunks + 1 > config.max_extra_chunks then
-        logger.info "extra chunks full, remove first chunk"
+        logger.debug "extra chunks full, remove first chunk"
         table.remove(chunks, 1)
     end
     chunks[#chunks + 1] = new_chunk
-    logger.info("extra add chunk", { idx = #chunks })
+    logger.debug("extra add chunk", { idx = #chunks })
 
     local input_extra = M.get_input_extra()
 

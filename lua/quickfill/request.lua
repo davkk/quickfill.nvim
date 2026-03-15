@@ -167,7 +167,7 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
     end)
 
     local payload = build_infill_payload(local_context, lsp_context)
-    logger.info("request llama infill, stream start", { prompt = local_context.middle })
+    logger.debug("request llama infill, stream start", { prompt = local_context.middle })
     stdin:write(payload, function()
         if stdin and not stdin:is_closing() then stdin:close() end
     end)

@@ -82,6 +82,12 @@ local ok, err = pcall(vim.validate, {
     max_lsp_completion_items = { config.max_lsp_completion_items, "number" },
     lsp_signature_help = { config.lsp_signature_help, "boolean" },
 })
-if not ok then vim.notify("quickfill: Invalid config - " .. err, vim.log.levels.WARN) end
+
+local logger = require "quickfill.logger"
+if not ok then
+    local msg = "quickfill: Invalid config - " .. err
+    vim.notify(msg, vim.log.levels.WARN)
+    logger.warn(msg)
+end
 
 return config

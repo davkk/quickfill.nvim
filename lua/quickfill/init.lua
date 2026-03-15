@@ -22,6 +22,9 @@ function M.start()
     if M.enabled then return end
     M.enabled = true
 
+    local logger = require "quickfill.logger"
+    logger.info("quickfill started")
+
     local a = require "quickfill.async"
     local cache = require "quickfill.cache"
     local context = require "quickfill.context"
@@ -103,6 +106,9 @@ end
 function M.stop()
     if not M.enabled then return end
     M.enabled = false
+
+    local logger = require "quickfill.logger"
+    logger.info("quickfill stopped")
 
     vim.api.nvim_clear_autocmds { group = M.group }
 

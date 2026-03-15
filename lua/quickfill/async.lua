@@ -1,6 +1,7 @@
 local M = {}
 
 local co = coroutine
+local logger = require "quickfill.logger"
 
 function M.pong(func, callback)
     local thread = co.create(func)
@@ -8,11 +9,17 @@ function M.pong(func, callback)
     step = function(...)
         local pack = { co.resume(thread, ...) }
         local ok, val = pack[1], pack[2]
-        assert(ok, val)
+        if not ok then
+            logger.error("async coroutine error", { error = val })
+            error(val)
+        end
         if co.status(thread) == "dead" then
             if callback then callback(val) end
         else
-            assert(type(val) == "function", "yielded value must be a thunk")
+            if type(val) ~= "function" then
+                logger.error("async invalid yield", { type = type(val) })
+                error("yielded value must be a thunk")
+            end
             val(step)
         end
     end

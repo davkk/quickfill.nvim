@@ -63,7 +63,7 @@ end
 ---@param route string
 ---@param payload string
 M.request_json = a.wrap(function(route, payload, resume)
-    logger.info("request llama", { route = route })
+    logger.debug("request llama", { route = route })
     vim.system({
         "curl",
         ("%s/%s"):format(config.url, route),
@@ -75,7 +75,7 @@ M.request_json = a.wrap(function(route, payload, resume)
         "@-",
     }, { stdin = payload }, function(result)
         if result.code == 0 then
-            logger.info("request llama", { route = route, code = result.code })
+            logger.debug("request llama", { route = route, code = result.code })
             resume(nil, vim.json.decode(result.stdout))
         else
             logger.error("request llama", { route = route, error = result.stderr, code = result.code })
