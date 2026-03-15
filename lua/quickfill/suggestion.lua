@@ -71,19 +71,32 @@ function M.accept()
 end
 
 function M.accept_word()
+    -- TODO: make it simpler
     if #suggestion == 0 then return end
 
     local lines = vim.split(suggestion, "\n", { plain = true })
-    local first_line = lines[1]
-    local match = first_line:match "^.-[%a%d_]+"
-
     local word
-    if match and #match > 0 then
-        word = match
-    elseif #lines > 1 then
-        word = first_line .. "\n"
+
+    if #lines == 1 then
+        local match = suggestion:match "^.-[%a%d_]+"
+        word = match or suggestion
     else
-        word = first_line
+        local first_line = lines[1]
+        local match = first_line:match "^.-[%a%d_]+"
+
+        if match and #match > 0 then
+            word = match
+        else
+            word = first_line .. "\n"
+            if lines[2] then
+                local next_match = lines[2]:match "^.-[%a%d_]+"
+                if next_match then
+                    word = word .. next_match
+                else
+                    word = word .. lines[2]
+                end
+            end
+        end
     end
 
     if #word == 0 then return end
@@ -93,19 +106,24 @@ function M.accept_word()
     local suffix = line:sub(col + 1)
 
     local word_lines = vim.split(word, "\n", { plain = true })
-    local _, _, remaining_suffix = utils.overlap(word_lines[1], suffix)
-    word_lines[1] = word_lines[1] .. remaining_suffix
+    if #word_lines == 1 then
+        local new_text = utils.overlap(word, suffix)
+        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
+        vim.api.nvim_win_set_cursor(0, { row, col + #word })
+    else
+        local _, _, remaining_suffix = utils.overlap(word_lines[1], suffix)
+        word_lines[1] = word_lines[1] .. remaining_suffix
+        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, word_lines)
+        local new_row = row + #word_lines - 1
+        local new_col = #word_lines == 1 and col + #word_lines[1] or #word_lines[#word_lines]
+        vim.api.nvim_win_set_cursor(0, { new_row, new_col })
+    end
 
-    vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, word_lines)
-
-    local new_row = row + #word_lines - 1
-    local new_col = #word_lines == 1 and col + #word_lines[1] or #word_lines[#word_lines]
-    vim.api.nvim_win_set_cursor(0, { new_row, new_col })
-
-    logger.debug("suggestion accept word", { word = word, row = row, col = col })
+    logger.info("suggestion accept word", { word = word, row = row, col = col })
 
     suggestion = suggestion:sub(#word + 1)
 
+    local new_row, new_col = context.get_cursor_pos()
     if #suggestion > 0 then
         M.show(suggestion, new_row, new_col)
     else
