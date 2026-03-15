@@ -19,11 +19,12 @@ Quick code infill suggestions by combining a local llama.cpp server with active 
 - **Prompt Caching**: Caches suggestions for repeated contexts to reduce latency.
 - **Cross-file Context Chunks**: Automatically extracts and includes relevant code snippets from your project files.
 - **Git-Aware**: Respects `.gitignore` for context extraction.
+- **Trigger Characters**: Automatically makes fresh requests on trigger characters (e.g., `.`, `:`, `(`, `{`, `[`).
 
 ## Installation
 
 ```lua
-vim.pack.add "https://github.com/davkk/quickfill.nvim"
+vim.pack.add({ "https://github.com/davkk/quickfill.nvim" })
 
 -- no need to call setup!
 
@@ -31,6 +32,7 @@ vim.pack.add "https://github.com/davkk/quickfill.nvim"
 -- you can map them to your preferred keys like this:
 vim.keymap.set("i", "<C-y>", "<Plug>(quickfill-accept)")         -- accept full suggestion
 vim.keymap.set("i", "<C-k>", "<Plug>(quickfill-accept-word)")    -- accept next word
+vim.keymap.set("i", "<C-l>", "<Plug>(quickfill-accept-replace)") -- accept and replace
 vim.keymap.set("i", "<C-x>", "<Plug>(quickfill-trigger)")        -- trigger fresh infill request
 ```
 
@@ -42,29 +44,32 @@ Defaults are used if not set explicitly:
 
 ```lua
 vim.g.quickfill = {
-    url = "http://localhost:8012",          -- llama.cpp server URL
+    url = "http://localhost:8080",          -- llama.cpp server URL
 
-    n_predict = 8,                          -- max tokens to predict
-    top_k = 30,                             -- top-k sampling
+    n_predict = 128,                        -- max tokens to predict
+    temperature = 0.3,                      -- temperature
+    top_k = 20,                             -- top-k sampling
     top_p = 0.4,                            -- top-p sampling
     repeat_penalty = 1.5,                   -- repeat penalty
 
     stop_chars = { "\n", "\r", "\r\n" },    -- stop characters
-    stop_on_trigger_char = true,            -- stop on trigger chars defined by LSP server
+    trigger_chars = { ".", ":", "[", "{", "(" }, -- trigger characters for fresh request
+    fresh_on_trigger_char = true,           -- make fresh request on trigger char
+    stop_on_trigger_char = false,           -- stop generating on trigger char
 
     n_prefix = 16,                          -- prefix context lines
-    n_suffix = 8,                           -- suffix context lines
+    n_suffix = 16,                          -- suffix context lines
 
     max_cache_entries = 32,                 -- max cache entries
 
-    extra_chunks = false,                   -- enable extra project chunks
-    max_extra_chunks = 4,                   -- max extra chunks
+    extra_chunks = true,                    -- enable extra project chunks
+    max_extra_chunks = 6,                   -- max extra chunks
     chunk_lines = 16,                       -- lines per chunk
 
     lsp_completion = true,                  -- enable LSP completions
-    max_lsp_completion_items = 15,          -- max LSP completion items
+    max_lsp_completion_items = 20,          -- max LSP completion items
 
-    lsp_signature_help = false,             -- enable signature help
+    lsp_signature_help = true,              -- enable signature help
 }
 ```
 
@@ -72,23 +77,17 @@ vim.g.quickfill = {
 
 Before using the plugin, make sure to have a llama.cpp server running.
 
-Here's an example command to start the server in the background:
+Here's an example command to download a model and start the server in the background:
 
 ```bash
 llama-server \
     -hf bartowski/Qwen2.5-Coder-0.5B-GGUF:Q4_0 \
     --n-gpu-layers 99 \
-    --threads 8 \
     --ctx-size 0 \
     --flash-attn on \
     --mlock \
-    --cache-reuse 256 \
-    --verbose \
-    --host localhost \
-    --port 8012
+    --cache-reuse 256
 ```
-
-This starts the server on `http://localhost:8012` with optimized settings for the Qwen2.5-Coder-0.5B model. Adjust the host and port as needed.
 
 ## Commands
 
