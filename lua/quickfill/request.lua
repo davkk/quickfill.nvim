@@ -94,18 +94,11 @@ end
 ---@param code number
 local function on_stream_end(buf, code)
     if code ~= 0 then
-        -- TODO: more info about error?
         logger.error("request llama infill, curl error", { code = code })
         vim.schedule(function()
             vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
         end)
-    end
-
-    pending_request = nil
-
-    if handle then
-        handle:close()
-        handle = nil
+        return
     end
 
     vim.schedule(function()
@@ -145,7 +138,8 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
 
     pending_request = local_context.middle
 
-    handle = vim.uv.spawn("curl", {
+    local h
+    h = vim.uv.spawn("curl", {
         args = {
             ("%s/infill"):format(config.url),
             "--no-buffer",
@@ -162,9 +156,22 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
             stdout:read_stop()
             stdout:close()
         end
-        if stdin and not stdin:is_closing() then stdin:read_stop() end
-        on_stream_end(buf, code)
+        if stdin and not stdin:is_closing() then
+            stdin:read_stop()
+            stdin:close()
+        end
+        if h and not h:is_closing() then
+            h:close()
+        end
+        if handle == h then
+            handle = nil
+        end
+        if pending_request then
+            on_stream_end(buf, code)
+        end
+        pending_request = nil
     end)
+    handle = h
 
     local payload = build_infill_payload(local_context, lsp_context)
     logger.debug("request llama infill, stream start", { prompt = local_context.middle })
@@ -182,9 +189,8 @@ function M.cancel_stream()
     pending_request = nil
     if handle and not handle:is_closing() then
         handle:kill()
-        handle:close()
+        handle = nil
     end
-    handle = nil
 end
 
 ---@param buf number
