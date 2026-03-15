@@ -6,7 +6,6 @@
 ---@field top_k? integer Top-k sampling
 ---@field top_p? number Top-p sampling
 ---@field repeat_penalty? number Repeat penalty
----@field presence_penalty? number Presence penalty
 ---@field stop_chars? string[] Stop characters
 ---@field trigger_chars? string[] Trigger characters
 ---@field fresh_on_trigger_char? boolean Make fresh request on trigger char
@@ -30,9 +29,8 @@ local default_config = {
     n_predict = 128,
     temperature = 0.3,
     top_k = 20,
-    top_p = 0.9,
-    repeat_penalty = 1.05,
-    presence_penalty = 0,
+    top_p = 0.4,
+    repeat_penalty = 1.5,
 
     stop_chars = { "\n", "\r", "\r\n" },
     trigger_chars = { ".", ":", "[", "{", "(" },
@@ -67,7 +65,6 @@ local ok, err = pcall(vim.validate, {
     top_k = { config.top_k, "number" },
     top_p = { config.top_p, "number" },
     repeat_penalty = { config.repeat_penalty, "number" },
-    presence_penalty = { config.presence_penalty, "number" },
     stop_chars = { config.stop_chars, "table" },
     trigger_chars = { config.trigger_chars, "table" },
     fresh_on_trigger_char = { config.fresh_on_trigger_char, "boolean" },

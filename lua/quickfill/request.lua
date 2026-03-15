@@ -42,7 +42,6 @@ local function build_infill_payload(local_context, lsp_context)
         top_k = config.top_k,
         top_p = config.top_p,
         repeat_penalty = config.repeat_penalty,
-        presence_penalty = config.presence_penalty,
         samplers = { "top_k", "top_p", "temperature", "infill" },
         logit_bias = lsp_context.logit_bias,
         t_max_predict_ms = 500,
