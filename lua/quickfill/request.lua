@@ -50,6 +50,39 @@ local function build_infill_payload(local_context, lsp_context)
     }
 end
 
+---@param trie quickfill.Trie
+---@param prefix string
+---@param typed string
+---@return boolean
+local function show_pending_suggestion(trie, prefix, typed)
+    if #typed < #prefix then return false end
+    if typed:sub(1, #prefix) ~= prefix then return false end
+
+    local node, tail = trie:find(prefix)
+    if not node then return false end
+
+    local sug = trie:find_longest(node, tail)
+    if #sug == 0 then return false end
+
+    local row, col = context.get_cursor_pos()
+    local typed_extra = typed:sub(#prefix + 1)
+
+    if #typed_extra == 0 then
+        suggestion.show(sug, row, col)
+        return true
+    end
+
+    if sug:sub(1, #typed_extra) == typed_extra then
+        local remaining = sug:sub(#typed_extra + 1)
+        if #remaining > 0 then
+            suggestion.show(remaining, row, col)
+            return true
+        end
+    end
+
+    return false
+end
+
 ---@param chunk string
 ---@param trie quickfill.Trie
 ---@param curr_node quickfill.TrieNode
@@ -62,6 +95,7 @@ local function on_stream_read(chunk, trie, curr_node)
     if not ok then return curr_node end
 
     local text = resp.content
+    if not text then return curr_node end
 
     if config.stop_on_trigger_char and resp.stop then
         if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return curr_node end
@@ -70,20 +104,10 @@ local function on_stream_read(chunk, trie, curr_node)
 
     curr_node = trie:insert(text, curr_node)
 
+    local request_prefix = pending_request
     vim.schedule(function()
-        local row, col = context.get_cursor_pos()
-        local line_prefix = context.get_line_prefix()
-        if pending_request then
-            local node, tail = trie:find(line_prefix)
-            if node then
-                local sug = trie:find_longest(node, tail)
-                if #sug > 0 then
-                    suggestion.show(sug, row, col)
-                else
-                    suggestion.clear()
-                end
-            end
-        end
+        if not request_prefix or pending_request ~= request_prefix then return end
+        show_pending_suggestion(trie, request_prefix, context.get_line_prefix())
     end)
 
     return curr_node
@@ -130,12 +154,15 @@ end
 function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
     if vim.bo.readonly or vim.bo.buftype ~= "" then return end
 
-    M.cancel_stream()
+    if handle and not handle:is_closing() then
+        handle:kill()
+        handle = nil
+    end
+
+    pending_request = local_context.middle
 
     local stdout = assert(vim.uv.new_pipe(false), "failed to create stdout pipe")
     local stdin = assert(vim.uv.new_pipe(false), "failed to create stdin pipe")
-
-    pending_request = local_context.middle
 
     local h
     h = vim.uv.spawn("curl", {
@@ -159,15 +186,9 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
             stdin:read_stop()
             stdin:close()
         end
-        if h and not h:is_closing() then
-            h:close()
-        end
-        if handle == h then
-            handle = nil
-        end
-        if pending_request then
-            on_stream_end(buf, code)
-        end
+        if h and not h:is_closing() then h:close() end
+        if handle == h then handle = nil end
+        if pending_request then on_stream_end(buf, code) end
         pending_request = nil
     end)
     handle = h
@@ -208,17 +229,21 @@ M.suggest = a.sync(function(buf)
             suggestion.show(sug, row, col)
             return
         end
-        suggestion.clear()
     end
 
     if pending_request then
-        if local_context.middle:sub(1, #pending_request) == pending_request then return end
+        if
+            local_context.middle:sub(1, #pending_request) == pending_request
+            and show_pending_suggestion(trie, pending_request, local_context.middle)
+        then
+            return
+        end
         M.cancel_stream()
     end
 
-    node = trie:insert(local_context.middle)
+    local insert_node = trie:insert(local_context.middle)
 
-    local sug = trie:find_longest(node) -- after insert, the node represents an exact match
+    local sug = trie:find_longest(insert_node)
     if #sug > 0 then
         suggestion.show(sug, row, col)
         return
@@ -227,7 +252,13 @@ M.suggest = a.sync(function(buf)
 
     local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
     a.wait(a.main_loop)
-    M.request_infill(buf, local_context, lsp_context, trie, node)
+
+    local curr_context = context.get_local_context(buf)
+    if curr_context.middle ~= local_context.middle then return end
+
+    if pending_request then return end
+
+    M.request_infill(buf, local_context, lsp_context, trie, insert_node)
 end)
 
 return M
