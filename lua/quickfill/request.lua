@@ -107,6 +107,7 @@ local function on_stream_read(chunk, trie, curr_node)
     local request_prefix = pending_request
     vim.schedule(function()
         if not request_prefix or pending_request ~= request_prefix then return end
+        logger.debug("show pending suggestion", { pending_request = pending_request, text = text })
         show_pending_suggestion(trie, request_prefix, context.get_line_prefix())
     end)
 
@@ -117,7 +118,7 @@ end
 ---@param code number
 local function on_stream_end(buf, code)
     if code ~= 0 then
-        logger.error("request llama infill, curl error", { code = code })
+        logger.error("request llama infill, curl error", { buf = buf, code = code })
         vim.schedule(function()
             vim.notify(("curl exited with code %d"):format(code), vim.diagnostic.severity.ERROR)
         end)
@@ -178,6 +179,10 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
         },
         stdio = { stdin, stdout },
     }, function(code)
+        logger.debug(
+            "request llama infill, stream end",
+            { handle = handle and handle:fileno() or vim.NIL, buf = buf, code = code }
+        )
         if stdout and not stdout:is_closing() then
             stdout:read_stop()
             stdout:close()
@@ -194,7 +199,10 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
     handle = h
 
     local payload = build_infill_payload(local_context, lsp_context)
-    logger.debug("request llama infill, stream start", { prompt = local_context.middle })
+    logger.debug(
+        "request llama infill, stream start",
+        { handle = handle and handle:fileno() or vim.NIL, prompt = local_context.middle }
+    )
     stdin:write(payload, function()
         if stdin and not stdin:is_closing() then stdin:close() end
     end)
@@ -206,6 +214,10 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
 end
 
 function M.cancel_stream()
+    logger.debug(
+        "request infill, cancel stream",
+        { handle = handle and handle:fileno() or vim.NIL, pending_request = pending_request }
+    )
     pending_request = nil
     if handle and not handle:is_closing() then
         handle:kill()
@@ -214,11 +226,8 @@ function M.cancel_stream()
 end
 
 ---@param buf number
-M.suggest = a.sync(function(buf)
-    suggestion.clear()
-
+function M.suggest(buf)
     local row, col = context.get_cursor_pos()
-
     local local_context = context.get_local_context(buf)
     local trie = cache.get_or_add(local_context)
 
@@ -232,17 +241,11 @@ M.suggest = a.sync(function(buf)
     end
 
     if pending_request then
-        if
-            local_context.middle:sub(1, #pending_request) == pending_request
-            and show_pending_suggestion(trie, pending_request, local_context.middle)
-        then
-            return
-        end
-        M.cancel_stream()
+        suggestion.clear()
+        return
     end
 
     local insert_node = trie:insert(local_context.middle)
-
     local sug = trie:find_longest(insert_node)
     if #sug > 0 then
         suggestion.show(sug, row, col)
@@ -250,15 +253,22 @@ M.suggest = a.sync(function(buf)
     end
     suggestion.clear()
 
-    local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
-    a.wait(a.main_loop)
+    a.pong(function()
+        local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
 
-    local curr_context = context.get_local_context(buf)
-    if curr_context.middle ~= local_context.middle then return end
+        a.wait(a.main_loop)
 
-    if pending_request then return end
+        local curr_context = context.get_local_context(buf)
+        if curr_context.middle ~= local_context.middle then
+            M.cancel_stream()
+            M.suggest(buf)
+            return
+        end
 
-    M.request_infill(buf, local_context, lsp_context, trie, insert_node)
-end)
+        if not pending_request then
+            M.request_infill(buf, local_context, lsp_context, trie, insert_node)
+        end
+    end, nil)
+end
 
 return M

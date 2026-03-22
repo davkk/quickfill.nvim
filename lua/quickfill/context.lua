@@ -5,12 +5,11 @@ local a = require "quickfill.async"
 local utils = require "quickfill.utils"
 local logger = require "quickfill.logger"
 
+local methods = vim.lsp.protocol.Methods
+
 ---@class quickfill.LspCompletion
 ---@field label string
 ---@field text string
-
----@type table<number, table<string, function>>
-local active_cancels = {}
 
 ---@return number, number
 function M.get_cursor_pos()
@@ -43,7 +42,7 @@ function M.get_local_context(buf)
         prefix = prefix:sub(-10):gsub("\n", "\\n"),
         middle = curr_prefix:gsub("\n", "\\n"),
         suffix = suffix:sub(1, 10):gsub("\n", "\\n"),
-        curr_suffix = curr_suffix
+        curr_suffix = curr_suffix,
     })
     return { prefix = prefix, middle = curr_prefix, suffix = suffix, curr_suffix = curr_suffix }
 end
@@ -60,51 +59,21 @@ end
 ---@param method string
 ---@param buf number
 ---@param params table
-local lsp_request = a.sync(function(buf, method, params)
+---@return table
+local lsp_request = a.wrap(function(buf, method, params, step)
     logger.debug("context lsp send", { buf = buf, method = method, params = params })
 
     if not is_supported(buf, method) then
         logger.warn("context lsp, buffer does not support method", { buf = buf, method = method, params = params })
-        return {}
+        return step {}
     end
 
-    if active_cancels[buf] and active_cancels[buf][method] then
-        pcall(active_cancels[buf][method])
-        active_cancels[buf][method] = nil
-    end
-
-    local results = a.wait(function(callback)
-        local done = false
-        local timer = assert(vim.uv.new_timer(), "failed to create timer")
-
-        local cancel_lsp_req = vim.lsp.buf_request_all(buf, method, params, function(res)
-            if not done then
-                done = true
-                if active_cancels[buf] then active_cancels[buf][method] = nil end
-                timer:stop()
-                timer:close()
-                logger.debug("context lsp receive", { buf = buf, method = method, params = params, results = res })
-                callback(res)
-            end
-        end)
-
-        active_cancels[buf] = active_cancels[buf] or {}
-        active_cancels[buf][method] = cancel_lsp_req
-
-        timer:start(300, 0, function()
-            if not done then
-                done = true
-                if active_cancels[buf] then active_cancels[buf][method] = nil end
-                if cancel_lsp_req then vim.schedule(cancel_lsp_req) end
-                timer:stop()
-                timer:close()
-                logger.warn("context lsp timeout", { buf = buf, method = method, params = params })
-                callback {}
-            end
-        end)
+    vim.lsp.buf_request_all(buf, method, params, function(res)
+        logger.debug("context lsp receive", { buf = buf, method = method, params = params, results = res })
+        step(res)
     end)
 
-    return results
+    return {}
 end)
 
 ---@return boolean
@@ -118,7 +87,7 @@ end
 ---@return table<string>
 local get_lsp_signature_help = a.sync(function(buf, params)
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.SignatureHelp, context: lsp.HandlerContext }>
-    local sig_resp = a.wait(lsp_request(buf, vim.lsp.protocol.Methods.textDocument_signatureHelp, params)) or {}
+    local sig_resp = a.wait(lsp_request(buf, methods.textDocument_signatureHelp, params)) or {}
     local signatures = {}
     for _, resp in ipairs(sig_resp) do
         if resp.err then
@@ -144,7 +113,7 @@ end)
 ---@return table<quickfill.LspCompletion>
 local get_lsp_completion = a.sync(function(buf, params, line_prefix)
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.CompletionList, context: lsp.HandlerContext }>
-    local cmp_resp = a.wait(lsp_request(buf, vim.lsp.protocol.Methods.textDocument_completion, params)) or {}
+    local cmp_resp = a.wait(lsp_request(buf, methods.textDocument_completion, params)) or {}
 
     local re = vim.regex [[\k*$]]
     local s, e = re:match_str(line_prefix)
@@ -218,14 +187,13 @@ M.get_lsp_context = a.sync(function(buf, line_prefix)
     local params = vim.lsp.util.make_position_params(0, "utf-8")
 
     local lsp_signatures, lsp_completions = a.wait_all {
-        config.lsp_signature_help and get_lsp_signature_help(buf, params),
-        config.lsp_completion and get_lsp_completion(buf, params, line_prefix),
+        config.lsp_signature_help and get_lsp_signature_help(buf, params) or a.resolve {},
+        config.lsp_completion and get_lsp_completion(buf, params, line_prefix) or a.resolve {},
     }
     lsp_signatures = lsp_signatures[1]
     lsp_completions = lsp_completions[1]
 
     local logit_bias = #lsp_completions > 0 and a.wait(get_logit_bias(lsp_completions)) or {}
-
     local cmp_labels = vim.tbl_map(function(item)
         return item.label
     end, lsp_completions)

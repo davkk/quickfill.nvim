@@ -67,6 +67,10 @@ function M.join(thunks)
     end
 end
 
+M.resolve = M.sync(function(to)
+    return to
+end)
+
 function M.wait(thunk)
     assert(type(thunk) == "function", "await expects a thunk")
     return co.yield(thunk)
