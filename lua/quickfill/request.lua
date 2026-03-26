@@ -97,6 +97,8 @@ local function on_stream_read(chunk, trie, curr_node)
     local text = resp.content
     if not text then return curr_node end
 
+    if resp.stop_type == "eos" then return curr_node end
+
     if config.stop_on_trigger_char and resp.stop then
         if resp.stop_type ~= "word" or vim.tbl_contains(config.stop_chars, resp.stopping_word) then return curr_node end
         text = resp.stopping_word
@@ -265,9 +267,7 @@ function M.suggest(buf)
             return
         end
 
-        if not pending_request then
-            M.request_infill(buf, local_context, lsp_context, trie, insert_node)
-        end
+        if not pending_request then M.request_infill(buf, local_context, lsp_context, trie, insert_node) end
     end, nil)
 end
 

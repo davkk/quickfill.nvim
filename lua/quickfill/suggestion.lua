@@ -49,23 +49,47 @@ end
 
 function M.accept()
     local row, col = context.get_cursor_pos()
-    local lines = vim.split(suggestion, "\n", { plain = true })
-    local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]
-    local suffix = line:sub(col + 1)
+    local sug_lines = vim.split(suggestion, "\n", { plain = true })
+    local curr_lines = vim.api.nvim_buf_get_lines(0, row - 1, row + #sug_lines, false)
+    local curr_line = curr_lines[1]
+    local suffix = curr_line:sub(col + 1)
+    local new_text = utils.overlap(sug_lines[1], suffix)
 
-    local new_text = utils.overlap(lines[1], suffix)
     if #new_text > 0 then
         vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { new_text })
-        vim.api.nvim_win_set_cursor(0, { row, col + #lines[1] })
+        vim.api.nvim_win_set_cursor(0, { row, col + #sug_lines[1] })
+    elseif col < #curr_line then
+        vim.api.nvim_win_set_cursor(0, { row, #curr_line })
     else
-        vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, #line, lines)
-        local new_row = row + #lines - 1
-        local new_col = #lines == 1 and col + #lines[1] or #lines[#lines]
+        local skip = 0
+        for idx = 2, #sug_lines do
+            if idx > #curr_lines or curr_lines[idx] ~= sug_lines[idx] then break end
+            skip = skip + 1
+        end
+
+        local ins_lines = vim.list_slice(sug_lines, skip + 1)
+
+        if #ins_lines > 0 then
+            if skip > 0 then
+                vim.api.nvim_buf_set_text(0, row - 1 + skip, 0, row - 1 + skip, 0, ins_lines)
+            else
+                vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, ins_lines)
+            end
+        end
+
+        local new_row = row + skip + #ins_lines - 1
+        local new_col
+        if #ins_lines == 0 then
+            new_col = #(curr_lines[skip + 1] or "")
+        elseif #ins_lines == 1 then
+            new_col = col + #ins_lines[1]
+        else
+            new_col = #ins_lines[#ins_lines]
+        end
         vim.api.nvim_win_set_cursor(0, { new_row, new_col })
     end
 
     logger.debug("suggestion accept", { suggestion = suggestion, row = row, col = col })
-
     M.clear()
     suggestion = ""
 end
