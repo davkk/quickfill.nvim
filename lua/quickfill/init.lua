@@ -40,9 +40,11 @@ function M.start()
     local function accept(fn)
         if #suggestion.get() == 0 then return end
         if vim.fn.pumvisible() ~= 0 then
-            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-x>", true, false, true), "n", false)
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-e>", true, false, true), "i", false)
+            vim.schedule(fn)
+        else
+            fn()
         end
-        vim.schedule(fn)
     end
     vim.keymap.set("i", "<Plug>(quickfill-accept)", utils.fn(accept, suggestion.accept))
     vim.keymap.set("i", "<Plug>(quickfill-accept-word)", utils.fn(accept, suggestion.accept_word))
