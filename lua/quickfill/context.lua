@@ -68,7 +68,25 @@ local lsp_request = a.wrap(function(buf, method, params, step)
         return step {}
     end
 
-    vim.lsp.buf_request_all(buf, method, params, function(res)
+    local timer = assert(vim.uv.new_timer(), "failed to create timer")
+    local cancel
+    local timed_out = false
+    timer:start(100, 0, function()
+        if not timed_out then
+            timed_out = true
+            timer:close()
+            logger.debug("context lsp timeout", { buf = buf, method = method, params = params })
+            vim.schedule(function()
+                if cancel then cancel() end
+            end)
+            step {}
+        end
+    end)
+
+    cancel = vim.lsp.buf_request_all(buf, method, params, function(res)
+        if timed_out then return end
+        timed_out = true
+        timer:close()
         logger.debug("context lsp receive", { buf = buf, method = method, params = params, results = res })
         step(res)
     end)
