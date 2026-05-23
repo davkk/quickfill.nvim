@@ -71,7 +71,7 @@ local lsp_request = a.wrap(function(buf, method, params, step)
     local timer = assert(vim.uv.new_timer(), "failed to create timer")
     local cancel
     local timed_out = false
-    timer:start(100, 0, function()
+    timer:start(200, 0, function()
         if not timed_out then
             timed_out = true
             timer:close()
