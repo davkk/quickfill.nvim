@@ -109,7 +109,7 @@ local function on_stream_read(chunk, trie, curr_node)
     local request_prefix = pending_request
     vim.schedule(function()
         if not request_prefix or pending_request ~= request_prefix then return end
-        logger.debug("show pending suggestion", { pending_request = pending_request, text = text })
+        logger.trace("show pending suggestion", { pending_request = pending_request, text = text })
         show_pending_suggestion(trie, request_prefix, context.get_line_prefix())
     end)
 
@@ -201,10 +201,7 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
     handle = h
 
     local payload = build_infill_payload(local_context, lsp_context)
-    logger.debug(
-        "request llama infill, stream start",
-        { handle = handle and handle:fileno() or vim.NIL, prompt = local_context.middle }
-    )
+    logger.debug("request llama infill, stream start", { handle = handle and handle:fileno() or vim.NIL })
     stdin:write(payload, function()
         if stdin and not stdin:is_closing() then stdin:close() end
     end)
@@ -216,7 +213,7 @@ function M.request_infill(buf, local_context, lsp_context, trie, curr_node)
 end
 
 function M.cancel_stream()
-    logger.debug(
+    logger.trace(
         "request infill, cancel stream",
         { handle = handle and handle:fileno() or vim.NIL, pending_request = pending_request }
     )

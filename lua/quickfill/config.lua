@@ -83,8 +83,8 @@ local ok, err = pcall(vim.validate, {
 local logger = require "quickfill.logger"
 if not ok then
     local msg = "quickfill: Invalid config - " .. err
-    vim.notify(msg, vim.log.levels.WARN)
-    logger.warn(msg)
+    vim.notify(msg, vim.log.levels.ERROR)
+    logger.error(msg)
 end
 
 return config

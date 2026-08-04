@@ -1,21 +1,26 @@
 local M = {}
 
+local TRACE = -2
 local DEBUG = -1
 local INFO = 0
 local WARN = 5
 local ERROR = 10
 
 local levels = {
+    [TRACE] = "TRACE",
     [DEBUG] = "DEBUG",
     [INFO] = "INFO",
     [WARN] = "WARN",
     [ERROR] = "ERROR",
 }
 
-local min_level = (vim.env.QUICKFILL_LOG_LEVEL == "debug" and DEBUG)
-    or (vim.env.QUICKFILL_LOG_LEVEL == "warn" and WARN)
-    or (vim.env.QUICKFILL_LOG_LEVEL == "error" and ERROR)
-    or INFO
+local env_level = vim.env.QUICKFILL_LOG_LEVEL
+local min_level = (env_level == "trace" and TRACE)
+    or (env_level == "debug" and DEBUG)
+    or (env_level == "info" and INFO)
+    or (env_level == "warn" and WARN)
+    or (env_level == "error" and ERROR)
+    or WARN
 
 local log_path = vim.fs.joinpath(vim.fn.stdpath "state", "quickfill.log")
 local fd, fd_err = vim.uv.fs_open(log_path, "a", 438)
@@ -55,6 +60,12 @@ end
 ---@param data table?
 function M.info(msg, data)
     M.log(INFO, msg, data)
+end
+
+---@param msg string
+---@param data table?
+function M.trace(msg, data)
+    M.log(TRACE, msg, data)
 end
 
 ---@param msg string

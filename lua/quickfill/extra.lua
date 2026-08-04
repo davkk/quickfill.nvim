@@ -10,6 +10,9 @@ local git_root = vim.fs.root(0, ".git")
 ---@type table<quickfill.ExtraChunk>
 local chunks = {}
 
+---@type table<number, boolean>
+local warned_gitignore = {}
+
 ---@param text string
 ---@return string
 local function trim(text)
@@ -55,7 +58,10 @@ M.try_add_chunk = a.sync(function(buf, row)
         local relative_path = utils.relative_path(buf, git_root)
         local obj = vim.system({ "git", "check-ignore", relative_path }):wait()
         if #obj.stdout > 0 then
-            logger.warn("file in gitignore", { buf = buf })
+            if not warned_gitignore[buf] then
+                warned_gitignore[buf] = true
+                logger.debug("file in gitignore", { buf = buf })
+            end
             return
         end
     end

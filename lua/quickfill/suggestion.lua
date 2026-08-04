@@ -117,7 +117,7 @@ function M.accept_word()
         suggestion = suggestion:sub(#word + 1)
     end
 
-    logger.info("suggestion accept word", { suggestion = suggestion, row = row, col = col })
+    logger.debug("suggestion accept word", { suggestion = suggestion, row = row, col = col })
 
     local new_row, new_col = context.get_cursor_pos()
     if #suggestion > 0 then

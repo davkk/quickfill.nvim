@@ -38,7 +38,7 @@ function M.get_local_context(buf)
         .. table.concat(lines, "\n", math.min(#lines + 1, row + 1), math.min(#lines, row + config.n_suffix))
         .. "\n"
 
-    logger.debug("context local", {
+    logger.trace("context local", {
         prefix = prefix:sub(-10):gsub("\n", "\\n"),
         middle = curr_prefix:gsub("\n", "\\n"),
         suffix = suffix:sub(1, 10):gsub("\n", "\\n"),
@@ -61,10 +61,10 @@ end
 ---@param params table
 ---@return table
 local lsp_request = a.wrap(function(buf, method, params, step)
-    logger.debug("context lsp send", { buf = buf, method = method, params = params })
+    logger.trace("context lsp send", { buf = buf, method = method })
 
     if not is_supported(buf, method) then
-        logger.warn("context lsp, buffer does not support method", { buf = buf, method = method, params = params })
+        logger.debug("context lsp, buffer does not support method", { buf = buf, method = method })
         return step {}
     end
 
@@ -75,7 +75,7 @@ local lsp_request = a.wrap(function(buf, method, params, step)
         if not timed_out then
             timed_out = true
             timer:close()
-            logger.debug("context lsp timeout", { buf = buf, method = method, params = params })
+            logger.trace("context lsp timeout", { buf = buf, method = method })
             vim.schedule(function()
                 if cancel then cancel() end
             end)
@@ -87,7 +87,7 @@ local lsp_request = a.wrap(function(buf, method, params, step)
         if timed_out then return end
         timed_out = true
         timer:close()
-        logger.debug("context lsp receive", { buf = buf, method = method, params = params, results = res })
+        logger.trace("context lsp receive", { buf = buf, method = method, results = #res })
         step(res)
     end)
 
@@ -114,7 +114,6 @@ local get_lsp_signature_help = a.sync(function(buf, params)
             break
         end
         if resp.result then
-            logger.debug("context lsp", { buf = buf, method = "signatureHelp", params = params })
             for _, sig in ipairs(resp.result.signatures or resp.result or {}) do
                 local signature = {}
                 if sig.label then signature[#signature + 1] = sig.label end
@@ -146,7 +145,6 @@ local get_lsp_completion = a.sync(function(buf, params, line_prefix)
             break
         end
         if resp.result then
-            logger.debug("context lsp", { buf = buf, method = "completion", params = params })
             for _, item in ipairs(resp.result.items or resp.result or {}) do
                 if num_items >= config.max_lsp_completion_items then break end
                 if
