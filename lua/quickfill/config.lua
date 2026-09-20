@@ -59,7 +59,7 @@ local config = vim.tbl_deep_extend("force", default_config, user_config)
 
 local ok, err = pcall(vim.validate, {
     url = { config.url, "string" },
-    model = { config.model, "string" },
+    model = { config.model, "string", true },
     n_predict = { config.n_predict, "number" },
     temperature = { config.temperature, "number" },
     top_k = { config.top_k, "number" },

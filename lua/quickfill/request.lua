@@ -31,7 +31,7 @@ local function build_infill_payload(local_context, lsp_context)
     end
 
     return vim.json.encode {
-        model = config.model,
+        model = config.model or "dummy",
         input_prefix = local_context.prefix,
         prompt = local_context.middle,
         input_suffix = local_context.suffix,

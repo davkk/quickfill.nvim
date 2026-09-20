@@ -98,8 +98,8 @@ M.try_add_chunk = a.sync(function(buf, row)
     }
 
     -- TODO: chunks should have unique lines between them
-    for idx, chunk in ipairs(chunks) do
-        local sim = similarity(lines, chunk.lines)
+    for idx = #chunks, 1, -1 do
+        local sim = similarity(lines, chunks[idx].lines)
         if sim > 0.55 then
             logger.debug("extra remove chunk", { idx = idx, sim = sim })
             table.remove(chunks, idx)
@@ -118,7 +118,7 @@ M.try_add_chunk = a.sync(function(buf, row)
     a.wait(utils.request_json(
         "infill",
         vim.json.encode {
-            model = config.model,
+            model = config.model or "dummy",
             input_prefix = "",
             prompt = "",
             input_suffix = "",

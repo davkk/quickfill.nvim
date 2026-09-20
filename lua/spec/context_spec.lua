@@ -9,6 +9,9 @@ local context = require "quickfill.context"
 local a = require "quickfill.async"
 local utils = require "quickfill.utils"
 
+local orig_get_clients = vim.lsp.get_clients
+local orig_request_all = vim.lsp.buf_request_all
+
 local function mock_clients()
     return {
         {
@@ -16,6 +19,7 @@ local function mock_clients()
             supports_method = function()
                 return true
             end,
+            stop = function() end,
         },
     }
 end
@@ -58,9 +62,9 @@ local function mock_request_all(_, method, _, callback)
     callback(results, {})
 end
 
-local function mock_request_json()
-    return function(resume)
-        resume(nil, {
+local function mock_request_json(_, _)
+    return function(step)
+        step(nil, {
             tokens = {
                 { piece = "(" },
                 { piece = "bar" },
@@ -76,11 +80,23 @@ local function mock_request_json()
 end
 
 describe("context", function()
-    vim.lsp.get_clients = mock_clients
-    vim.lsp.buf_request_all = mock_request_all
-    utils.request_json = mock_request_json
+    local orig_request_json
+    local buf
 
-    local buf = test_utils.create_test_file()
+    setup(function()
+        orig_request_json = utils.request_json
+        vim.lsp.get_clients = mock_clients
+        vim.lsp.buf_request_all = mock_request_all
+        utils.request_json = mock_request_json
+        buf = test_utils.create_test_file()
+    end)
+
+    teardown(function()
+        vim.lsp.get_clients = orig_get_clients
+        vim.lsp.buf_request_all = orig_request_all
+        utils.request_json = orig_request_json
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end)
 
     it("should get local context", function()
         vim.api.nvim_win_set_cursor(0, { 16, 10 })
@@ -89,6 +105,7 @@ describe("context", function()
             middle = "    local ",
             prefix = "    end\n\n    local a = 0\n    local b = 1\n",
             suffix = "next_val\n\n    for i = 2, n do\n        next_val = a + b\n        a = b\n        b = next_val\n",
+            curr_suffix = "next_val",
         }
         assert.are.same(expected, result)
     end)
@@ -96,8 +113,6 @@ describe("context", function()
     it(
         "should get lsp context",
         a.sync(function()
-            local _test_done = false
-            local err = nil
             local result = a.wait(context.get_lsp_context(buf, ""))
             local expected = {
                 logit_bias = {
@@ -113,14 +128,7 @@ describe("context", function()
                     2
                 ),
             }
-            _, err = pcall(function()
-                _test_done = true
-                assert.are.same(expected, result)
-            end)
-            vim.wait(1000, function()
-                return _test_done
-            end)
-            assert.is_falsy(err)
+            assert.are.same(expected, result)
         end)
     )
 end)

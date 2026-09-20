@@ -28,20 +28,22 @@ end
 function M.get_or_add(context)
     local key = get_key(context)
 
-    lru = vim.tbl_filter(function(k)
-        return k ~= key
-    end, lru)
-    lru[#lru + 1] = key
-
-    if not cache[key] then
-        if vim.tbl_count(cache) > config.max_cache_entries - 1 then
-            local least_used = lru[1]
-            logger.debug("cache evict", { key = least_used })
-            cache[least_used] = nil
-            table.remove(lru, 1)
-        end
-        cache[key] = Trie:new()
+    if cache[key] then
+        lru = vim.tbl_filter(function(k)
+            return k ~= key
+        end, lru)
+        lru[#lru + 1] = key
+        return cache[key]
     end
+
+    if #lru >= config.max_cache_entries then
+        local least_used = lru[1]
+        logger.debug("cache evict", { key = least_used })
+        cache[least_used] = nil
+        table.remove(lru, 1)
+    end
+    cache[key] = Trie:new()
+    lru[#lru + 1] = key
 
     return cache[key]
 end

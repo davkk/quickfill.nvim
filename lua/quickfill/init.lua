@@ -116,6 +116,7 @@ function M.stop()
 
     pcall(vim.keymap.del, "i", "<Plug>(quickfill-accept)")
     pcall(vim.keymap.del, "i", "<Plug>(quickfill-accept-word)")
+    pcall(vim.keymap.del, "i", "<Plug>(quickfill-accept-replace)")
     pcall(vim.keymap.del, "i", "<Plug>(quickfill-trigger)")
 end
 

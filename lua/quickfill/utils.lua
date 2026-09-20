@@ -57,7 +57,10 @@ end
 function M.relative_path(bufnr, root)
     local cwd = root or vim.fn.getcwd()
     local fullpath = vim.api.nvim_buf_get_name(bufnr)
-    return fullpath:sub(#cwd + 2)
+    if fullpath:sub(1, #cwd + 1) == cwd .. "/" then
+        return fullpath:sub(#cwd + 2)
+    end
+    return fullpath
 end
 
 ---@param route string
