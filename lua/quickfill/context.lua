@@ -7,7 +7,7 @@ local logger = require "quickfill.logger"
 
 local methods = vim.lsp.protocol.Methods
 
----@class quickfill.LspCompletion
+---@class quickfill.Completion
 ---@field label string
 ---@field text string
 
@@ -21,6 +21,13 @@ end
 function M.get_line_prefix()
     local _, col = M.get_cursor_pos()
     return vim.api.nvim_get_current_line():sub(1, col)
+end
+
+---@param line_prefix string
+local function get_keyword(line_prefix)
+    local re = vim.regex [[\k*$]]
+    local s, e = re:match_str(line_prefix)
+    return s and line_prefix:sub(s + 1, e) or ""
 end
 
 ---@param buf number
@@ -46,6 +53,69 @@ function M.get_local_context(buf)
     })
     return { prefix = prefix, middle = curr_prefix, suffix = suffix, curr_suffix = curr_suffix }
 end
+
+---@param completions table<quickfill.Completion>
+local get_logit_bias = a.sync(function(completions)
+    local content = vim.tbl_map(function(item)
+        return item.text
+    end, completions)
+    local err, tokenize_resp = a.wait(utils.request_json(
+        "tokenize",
+        vim.json.encode {
+            model = config.model or "dummy",
+            content = content,
+            with_pieces = true,
+        }
+    ))
+    if err ~= nil then return {} end
+    local logit_bias = {}
+    for _, token in ipairs(tokenize_resp.tokens or {}) do
+        local piece = token.piece
+        if not logit_bias[piece] then logit_bias[piece] = 3 end
+    end
+    return logit_bias
+end)
+
+---@param base string
+---@return table<quickfill.Completion>
+local function get_completion(base)
+    base = base:lower()
+    local words = {}
+    local re = vim.regex "\\k\\+"
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(buf) then
+            local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+            for _, line in ipairs(lines) do
+                local pos = 0
+                while pos < #line do
+                    local s, e = re:match_str(line:sub(pos + 1))
+                    if not s then break end
+                    local w = line:sub(pos + s + 1, pos + e)
+                    if w:lower():sub(1, #base) == base then words[w] = true end
+                    pos = pos + e
+                end
+            end
+        end
+    end
+    return vim.tbl_keys(words)
+end
+
+M.get_buffers_context = a.sync(function(line_prefix)
+    local keyword = get_keyword(line_prefix)
+    if #keyword < 2 then return {} end
+    -- TODO: I think I should be sorting these for deterministic results later when we truncate
+    local words = get_completion(keyword)
+    local comps = vim.tbl_map(function(item)
+        -- FIXME: we should not be copying so many strings here
+        return { text = item, label = item }
+    end, words)
+    local logit_bias = #comps > 0 and a.wait(get_logit_bias(comps)) or {}
+    return {
+        logit_bias = vim.tbl_count(logit_bias) > 0 and logit_bias or nil,
+        completions = #words > 0 and table.concat(words, "\n") .. "\n" or nil,
+        signatures = nil,
+    }
+end)
 
 ---@param method string
 ---@return boolean
@@ -127,15 +197,11 @@ end)
 ---@param buf number
 ---@param params lsp.TextDocumentPositionParams
 ---@param line_prefix string
----@return table<quickfill.LspCompletion>
+---@return table<quickfill.Completion>
 local get_lsp_completion = a.sync(function(buf, params, line_prefix)
     ---@type table<integer, { err: (lsp.ResponseError)?, result: lsp.CompletionList, context: lsp.HandlerContext }>
     local cmp_resp = a.wait(lsp_request(buf, methods.textDocument_completion, params)) or {}
-
-    local re = vim.regex [[\k*$]]
-    local s, e = re:match_str(line_prefix)
-    local keyword = s and line_prefix:sub(s + 1, e) or ""
-
+    local keyword = get_keyword(line_prefix)
     local num_items = 0
     local completions = {}
     for _, resp in ipairs(cmp_resp) do
@@ -173,36 +239,11 @@ local get_lsp_completion = a.sync(function(buf, params, line_prefix)
     return completions
 end)
 
----@param completions table<quickfill.LspCompletion>
-local get_logit_bias = a.sync(function(completions)
-    local content = vim.tbl_map(function(item)
-        return item.text
-    end, completions)
-    local err, tokenize_resp = a.wait(utils.request_json(
-        "tokenize",
-        vim.json.encode {
-            model = config.model or "dummy",
-            content = content,
-            with_pieces = true,
-        }
-    ))
-    if err ~= nil then return {} end
-
-    local logit_bias = {}
-    for _, token in ipairs(tokenize_resp.tokens or {}) do
-        local piece = token.piece
-        if not logit_bias[piece] then logit_bias[piece] = 3 end
-    end
-    return logit_bias
-end)
-
 ---@param buf number
 ---@param line_prefix string
 ---@return quickfill.LspContext
 M.get_lsp_context = a.sync(function(buf, line_prefix)
-    if not config.enable_lsp then
-        return {}
-    end
+    if not config.enable_lsp then return {} end
     local params = vim.lsp.util.make_position_params(0, "utf-8")
 
     local lsp_signatures, lsp_completions = a.wait_all {
@@ -222,6 +263,17 @@ M.get_lsp_context = a.sync(function(buf, line_prefix)
         completions = #cmp_labels > 0 and table.concat(cmp_labels, "\n") .. "\n" or nil,
         signatures = #lsp_signatures > 0 and table.concat(lsp_signatures, "\n") .. "\n" or nil,
     }
+end)
+
+---@param buf number
+---@param line_prefix string
+---@return quickfill.LspContext
+M.get_active_context = a.sync(function(buf, line_prefix)
+    if config.enable_lsp then
+        return a.wait(M.get_lsp_context(buf, line_prefix))
+    else
+        return a.wait(M.get_buffers_context(line_prefix))
+    end
 end)
 
 return M

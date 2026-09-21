@@ -23,7 +23,7 @@ function M.start()
     M.enabled = true
 
     local logger = require "quickfill.logger"
-    logger.info("quickfill started")
+    logger.info "quickfill started"
 
     local a = require "quickfill.async"
     local cache = require "quickfill.cache"
@@ -58,12 +58,12 @@ function M.start()
         suggestion.clear()
         cache.remove_entry(local_context)
 
-        local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
+        local ctx = a.wait(context.get_active_context(buf, local_context.middle))
 
         a.wait(a.main_loop)
         local trie = cache.get_or_add(local_context)
         local node = trie:insert(local_context.middle)
-        request.request_infill(buf, local_context, lsp_context, trie, node)
+        request.request_infill(buf, local_context, ctx, trie, node)
     end)
     vim.keymap.set("i", "<Plug>(quickfill-trigger)", fresh_request)
 
@@ -110,7 +110,7 @@ function M.stop()
     M.enabled = false
 
     local logger = require "quickfill.logger"
-    logger.info("quickfill stopped")
+    logger.info "quickfill stopped"
 
     vim.api.nvim_clear_autocmds { group = M.group }
 

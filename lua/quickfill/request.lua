@@ -253,7 +253,7 @@ function M.suggest(buf)
     suggestion.clear()
 
     a.pong(function()
-        local lsp_context = a.wait(context.get_lsp_context(buf, local_context.middle))
+        local ctx = a.wait(context.get_active_context(buf, local_context.middle))
 
         a.wait(a.main_loop)
 
@@ -264,7 +264,7 @@ function M.suggest(buf)
             return
         end
 
-        if not pending_request then M.request_infill(buf, local_context, lsp_context, trie, insert_node) end
+        if not pending_request then M.request_infill(buf, local_context, ctx, trie, insert_node) end
     end, nil)
 end
 
