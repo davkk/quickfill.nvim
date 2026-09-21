@@ -66,6 +66,8 @@ vim.g.quickfill = {
     max_extra_chunks = 6,                   -- max extra chunks
     chunk_lines = 16,                       -- lines per chunk
 
+    enable_lsp = false,                     -- enable LSP
+
     lsp_completion = true,                  -- enable LSP completions
     max_lsp_completion_items = 20,          -- max LSP completion items
 

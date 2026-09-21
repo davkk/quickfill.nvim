@@ -200,6 +200,9 @@ end)
 ---@param line_prefix string
 ---@return quickfill.LspContext
 M.get_lsp_context = a.sync(function(buf, line_prefix)
+    if not config.enable_lsp then
+        return {}
+    end
     local params = vim.lsp.util.make_position_params(0, "utf-8")
 
     local lsp_signatures, lsp_completions = a.wait_all {

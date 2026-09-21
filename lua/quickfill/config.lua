@@ -16,6 +16,7 @@
 ---@field extra_chunks? boolean Enable extra chunks
 ---@field max_extra_chunks? integer Max extra chunks
 ---@field chunk_lines? integer Lines per chunk
+---@field enable_lsp? boolean Enable LSP
 ---@field lsp_completion? boolean Enable LSP completion
 ---@field max_lsp_completion_items? integer Max LSP items
 ---@field lsp_signature_help? boolean Enable signature help
@@ -46,6 +47,8 @@ local default_config = {
     max_extra_chunks = 6,
     chunk_lines = 16,
 
+    enable_lsp = false,
+
     lsp_completion = true,
     max_lsp_completion_items = 20,
 
@@ -75,6 +78,7 @@ local ok, err = pcall(vim.validate, {
     extra_chunks = { config.extra_chunks, "boolean" },
     max_extra_chunks = { config.max_extra_chunks, "number" },
     chunk_lines = { config.chunk_lines, "number" },
+    enable_lsp = { config.enable_lsp, "boolean" },
     lsp_completion = { config.lsp_completion, "boolean" },
     max_lsp_completion_items = { config.max_lsp_completion_items, "number" },
     lsp_signature_help = { config.lsp_signature_help, "boolean" },

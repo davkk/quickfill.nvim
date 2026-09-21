@@ -1,6 +1,7 @@
 vim.g.quickfill = {
     n_prefix = 4,
     n_suffix = 4,
+    enable_lsp = true,
 }
 
 local test_utils = require "spec.test_utils"
