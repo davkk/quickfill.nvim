@@ -76,40 +76,33 @@ local get_logit_bias = a.sync(function(completions)
     return logit_bias
 end)
 
+local MAX_KEYWORDS = 100
+
 ---@param base string
 ---@return table<quickfill.Completion>
-local function get_completion(base)
-    base = base:lower()
-    local words = {}
-    local re = vim.regex "\\k\\+"
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(buf) then
-            local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-            for _, line in ipairs(lines) do
-                local pos = 0
-                while pos < #line do
-                    local s, e = re:match_str(line:sub(pos + 1))
-                    if not s then break end
-                    local w = line:sub(pos + s + 1, pos + e)
-                    if w:lower():sub(1, #base) == base then words[w] = true end
-                    pos = pos + e
-                end
-            end
+local get_tags = a.sync(function(base)
+    local comps = {}
+    local tags = vim.fn.taglist("^" .. vim.pesc(base))
+    for _, tag in ipairs(tags) do
+        if tag.name and tag.name:lower():sub(1, #base) == base then
+            comps[tag.name] = {
+                name = tag.name,
+                label = #tag.cmd > 4 and tag.cmd:sub(3, -3) or tag.name,
+            }
         end
     end
-    return vim.tbl_keys(words)
-end
+    return vim.tbl_values(comps)
+end)
 
 M.get_buffers_context = a.sync(function(line_prefix)
     local keyword = get_keyword(line_prefix)
     if #keyword < 2 then return {} end
     -- TODO: I think I should be sorting these for deterministic results later when we truncate
-    local words = get_completion(keyword)
-    local comps = vim.tbl_map(function(item)
-        -- FIXME: we should not be copying so many strings here
-        return { text = item, label = item }
-    end, words)
-    local logit_bias = #comps > 0 and a.wait(get_logit_bias(comps)) or {}
+    local tags = a.wait(get_tags(keyword)) or {}
+    local words = vim.tbl_map(function(item)
+        return item.name
+    end, tags)
+    local logit_bias = #tags > 0 and a.wait(get_logit_bias(tags)) or {}
     return {
         logit_bias = vim.tbl_count(logit_bias) > 0 and logit_bias or nil,
         completions = #words > 0 and table.concat(words, "\n") .. "\n" or nil,
