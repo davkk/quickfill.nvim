@@ -76,22 +76,32 @@ local get_logit_bias = a.sync(function(completions)
     return logit_bias
 end)
 
-local MAX_KEYWORDS = 100
-
 ---@param base string
----@return table<quickfill.Completion>
-local get_tags = a.sync(function(base)
-    local comps = {}
-    local tags = vim.fn.taglist("^" .. vim.pesc(base))
-    for _, tag in ipairs(tags) do
-        if tag.name and tag.name:lower():sub(1, #base) == base then
-            comps[tag.name] = {
-                name = tag.name,
-                label = #tag.cmd > 4 and tag.cmd:sub(3, -3) or tag.name,
-            }
-        end
+local tag_lookup = a.wrap(function(base, step)
+    local files = vim.fn.tagfiles()
+    if #files == 0 or vim.fn.executable "readtags" == 0 then return step {} end
+    local pending, comps = #files, {}
+    for _, file in ipairs(files) do
+        local cmd = { "readtags", "-t", file, "-p", "-", base }
+        vim.system(cmd, { text = true }, function(out)
+            for line in (out.stdout or ""):gmatch "[^\n]+" do
+                local name, _, ex = line:match "^([^\t]+)\t([^\t]*)\t(.*)$"
+                if name and not comps[name] then
+                    local cmd = ex and ex:match '^(.-);"' or ex
+                    comps[name] = {
+                        name = name,
+                        label = cmd and #cmd > 4 and cmd:sub(3, -3) or name,
+                    }
+                end
+            end
+            pending = pending - 1
+            if pending == 0 then step(vim.tbl_values(comps)) end
+        end)
     end
-    return vim.tbl_values(comps)
+end)
+
+local get_tags = a.sync(function(base)
+    return a.wait(tag_lookup(base))
 end)
 
 M.get_buffers_context = a.sync(function(line_prefix)
